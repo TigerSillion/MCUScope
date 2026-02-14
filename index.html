@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCUScope - Web Oscilloscope</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: #16213e;
+            border-bottom: 1px solid #0f3460;
+            padding: 8px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 48px;
+        }
+        .header .logo {
+            font-size: 20px;
+            font-weight: bold;
+            color: #00d4ff;
+            letter-spacing: 2px;
+        }
+        .header .logo span { color: #e94560; }
+        .header .status {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            color: #8899aa;
+        }
+        .header .status .connected {
+            color: #00ff88;
+        }
+
+        /* Main layout */
+        .main {
+            display: flex;
+            height: calc(100vh - 48px);
+        }
+
+        /* Sidebar controls */
+        .sidebar {
+            width: 260px;
+            background: #16213e;
+            border-right: 1px solid #0f3460;
+            padding: 12px;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .control-group {
+            margin-bottom: 16px;
+        }
+        .control-group h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #5588aa;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #0f3460;
+            padding-bottom: 4px;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+        .control-row label {
+            font-size: 12px;
+            color: #99aabb;
+            min-width: 60px;
+        }
+        .control-row select, .control-row input[type="range"] {
+            flex: 1;
+            margin-left: 8px;
+        }
+
+        select {
+            background: #0a0a1a;
+            color: #e0e0e0;
+            border: 1px solid #0f3460;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        select:focus { outline: none; border-color: #00d4ff; }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 4px;
+            background: #0f3460;
+            border-radius: 2px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #00d4ff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .value-display {
+            font-size: 11px;
+            color: #00d4ff;
+            min-width: 50px;
+            text-align: right;
+            font-family: monospace;
+        }
+
+        /* Channel buttons */
+        .channel-btns {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .ch-btn {
+            flex: 1;
+            padding: 6px;
+            border: 2px solid;
+            border-radius: 4px;
+            background: transparent;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .ch-btn.ch1 { border-color: #ffdd00; color: #ffdd00; }
+        .ch-btn.ch2 { border-color: #00ccff; color: #00ccff; }
+        .ch-btn.ch3 { border-color: #ff6644; color: #ff6644; }
+        .ch-btn.ch4 { border-color: #44ff88; color: #44ff88; }
+        .ch-btn.active { background: rgba(255,255,255,0.1); }
+        .ch-btn.inactive { opacity: 0.3; }
+
+        /* Action buttons */
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            background: #0a0a1a;
+            color: #e0e0e0;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:hover { background: #0f3460; }
+        .btn.primary { border-color: #00d4ff; color: #00d4ff; }
+        .btn.danger { border-color: #e94560; color: #e94560; }
+        .btn.active { background: #0f3460; }
+
+        .btn-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .btn-row .btn { flex: 1; text-align: center; }
+
+        /* Scope area */
+        .scope-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .canvas-wrap {
+            flex: 1;
+            position: relative;
+            margin: 8px;
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            overflow: hidden;
+            background: #0a0a1a;
+        }
+        #scopeCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Overlay measurements */
+        .measurements {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(10, 10, 26, 0.85);
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-family: monospace;
+            font-size: 11px;
+            line-height: 1.6;
+            min-width: 180px;
+        }
+        .meas-ch1 { color: #ffdd00; }
+        .meas-ch2 { color: #00ccff; }
+        .meas-ch3 { color: #ff6644; }
+        .meas-ch4 { color: #44ff88; }
+
+        /* Trigger indicator */
+        .trigger-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 1px;
+            border-top: 1px dashed #e94560;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        /* Bottom status bar */
+        .statusbar {
+            background: #16213e;
+            border-top: 1px solid #0f3460;
+            padding: 4px 16px;
+            display: flex;
+            gap: 24px;
+            font-size: 11px;
+            font-family: monospace;
+            color: #5588aa;
+            height: 28px;
+            align-items: center;
+        }
+        .statusbar .highlight { color: #00d4ff; }
+
+        /* Signal source label */
+        .signal-label {
+            font-size: 10px;
+            color: #667788;
+            margin-top: 2px;
+        }
+
+        /* FFT panel */
+        .fft-wrap {
+            height: 150px;
+            margin: 0 8px 8px 8px;
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            overflow: hidden;
+            background: #0a0a1a;
+            position: relative;
+        }
+        .fft-wrap.hidden { display: none; }
+        #fftCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .fft-label {
+            position: absolute;
+            top: 4px;
+            left: 8px;
+            font-size: 10px;
+            color: #5588aa;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="logo">MCU<span>Scope</span> <small style="font-size:11px;color:#5588aa;font-weight:normal">Web v1.0</small></div>
+    <div class="status">
+        <span>Sample Rate: <span class="connected" id="sampleRateDisplay">1 MSa/s</span></span>
+        <span>Buffer: <span class="connected">8K</span></span>
+        <span id="fpsDisplay">FPS: 60</span>
+    </div>
+</div>
+
+<div class="main">
+    <div class="sidebar">
+        <!-- Run/Stop -->
+        <div class="control-group">
+            <div class="btn-row">
+                <button class="btn primary active" id="btnRun" onclick="toggleRun()">▶ Run</button>
+                <button class="btn danger" id="btnSingle" onclick="singleTrigger()">◉ Single</button>
+            </div>
+        </div>
+
+        <!-- Channels -->
+        <div class="control-group">
+            <h3>Channels</h3>
+            <div class="channel-btns">
+                <div class="ch-btn ch1 active" onclick="toggleChannel(0)">CH1</div>
+                <div class="ch-btn ch2 active" onclick="toggleChannel(1)">CH2</div>
+                <div class="ch-btn ch3 inactive" onclick="toggleChannel(2)">CH3</div>
+                <div class="ch-btn ch4 inactive" onclick="toggleChannel(3)">CH4</div>
+            </div>
+        </div>
+
+        <!-- CH1 -->
+        <div class="control-group" id="ch1-controls">
+            <h3 style="color:#ffdd00">CH1 Settings</h3>
+            <div class="control-row">
+                <label>Signal</label>
+                <select id="ch1-wave" onchange="updateChannel(0)">
+                    <option value="sine">Sine</option>
+                    <option value="square">Square</option>
+                    <option value="triangle">Triangle</option>
+                    <option value="sawtooth">Sawtooth</option>
+                    <option value="noise">Noise</option>
+                    <option value="pwm">PWM</option>
+                </select>
+            </div>
+            <div class="control-row">
+                <label>Freq</label>
+                <input type="range" id="ch1-freq" min="1" max="200" value="10" oninput="updateChannel(0)">
+                <span class="value-display" id="ch1-freq-val">10 Hz</span>
+            </div>
+            <div class="control-row">
+                <label>Amp</label>
+                <input type="range" id="ch1-amp" min="5" max="100" value="80" oninput="updateChannel(0)">
+                <span class="value-display" id="ch1-amp-val">3.2V</span>
+            </div>
+            <div class="control-row">
+                <label>Offset</label>
+                <input type="range" id="ch1-offset" min="-100" max="100" value="0" oninput="updateChannel(0)">
+                <span class="value-display" id="ch1-offset-val">0.0V</span>
+            </div>
+            <div class="control-row">
+                <label>V/Div</label>
+                <select id="ch1-vdiv" onchange="updateChannel(0)">
+                    <option value="0.1">100mV</option>
+                    <option value="0.2">200mV</option>
+                    <option value="0.5">500mV</option>
+                    <option value="1" selected>1V</option>
+                    <option value="2">2V</option>
+                    <option value="5">5V</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- CH2 -->
+        <div class="control-group" id="ch2-controls">
+            <h3 style="color:#00ccff">CH2 Settings</h3>
+            <div class="control-row">
+                <label>Signal</label>
+                <select id="ch2-wave" onchange="updateChannel(1)">
+                    <option value="sine">Sine</option>
+                    <option value="square" selected>Square</option>
+                    <option value="triangle">Triangle</option>
+                    <option value="sawtooth">Sawtooth</option>
+                    <option value="noise">Noise</option>
+                    <option value="pwm">PWM</option>
+                </select>
+            </div>
+            <div class="control-row">
+                <label>Freq</label>
+                <input type="range" id="ch2-freq" min="1" max="200" value="25" oninput="updateChannel(1)">
+                <span class="value-display" id="ch2-freq-val">25 Hz</span>
+            </div>
+            <div class="control-row">
+                <label>Amp</label>
+                <input type="range" id="ch2-amp" min="5" max="100" value="60" oninput="updateChannel(1)">
+                <span class="value-display" id="ch2-amp-val">2.4V</span>
+            </div>
+            <div class="control-row">
+                <label>Offset</label>
+                <input type="range" id="ch2-offset" min="-100" max="100" value="0" oninput="updateChannel(1)">
+                <span class="value-display" id="ch2-offset-val">0.0V</span>
+            </div>
+            <div class="control-row">
+                <label>V/Div</label>
+                <select id="ch2-vdiv" onchange="updateChannel(1)">
+                    <option value="0.1">100mV</option>
+                    <option value="0.2">200mV</option>
+                    <option value="0.5">500mV</option>
+                    <option value="1" selected>1V</option>
+                    <option value="2">2V</option>
+                    <option value="5">5V</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Time Base -->
+        <div class="control-group">
+            <h3>Time Base</h3>
+            <div class="control-row">
+                <label>T/Div</label>
+                <select id="timebase" onchange="updateTimebase()">
+                    <option value="1">1ms</option>
+                    <option value="2">2ms</option>
+                    <option value="5">5ms</option>
+                    <option value="10" selected>10ms</option>
+                    <option value="20">20ms</option>
+                    <option value="50">50ms</option>
+                    <option value="100">100ms</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Trigger -->
+        <div class="control-group">
+            <h3>Trigger</h3>
+            <div class="control-row">
+                <label>Source</label>
+                <select id="trig-source">
+                    <option value="0">CH1</option>
+                    <option value="1">CH2</option>
+                </select>
+            </div>
+            <div class="control-row">
+                <label>Edge</label>
+                <select id="trig-edge">
+                    <option value="rising">Rising ↑</option>
+                    <option value="falling">Falling ↓</option>
+                </select>
+            </div>
+            <div class="control-row">
+                <label>Level</label>
+                <input type="range" id="trig-level" min="-100" max="100" value="0" oninput="updateTrigger()">
+                <span class="value-display" id="trig-level-val">0.0V</span>
+            </div>
+        </div>
+
+        <!-- Display -->
+        <div class="control-group">
+            <h3>Display</h3>
+            <div class="control-row">
+                <label>FFT</label>
+                <button class="btn" id="btnFFT" onclick="toggleFFT()" style="flex:1">Show FFT</button>
+            </div>
+            <div class="control-row">
+                <label>Persist</label>
+                <select id="persist-mode" onchange="updatePersist()">
+                    <option value="off">Off</option>
+                    <option value="low">Low</option>
+                    <option value="high">High</option>
+                    <option value="infinite">Infinite</option>
+                </select>
+            </div>
+            <div class="control-row">
+                <label>Grid</label>
+                <select id="grid-style">
+                    <option value="full">Full</option>
+                    <option value="dots">Dots</option>
+                    <option value="none">None</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Math -->
+        <div class="control-group">
+            <h3>Math</h3>
+            <div class="control-row">
+                <label>Op</label>
+                <select id="math-op">
+                    <option value="none">None</option>
+                    <option value="add">CH1 + CH2</option>
+                    <option value="sub">CH1 - CH2</option>
+                    <option value="mult">CH1 × CH2</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Export -->
+        <div class="control-group">
+            <h3>Export</h3>
+            <div class="btn-row">
+                <button class="btn" onclick="exportCSV()">📥 CSV</button>
+                <button class="btn" onclick="exportScreenshot()">📷 PNG</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="scope-area">
+        <div class="canvas-wrap">
+            <canvas id="scopeCanvas"></canvas>
+            <div class="measurements" id="measurements"></div>
+        </div>
+        <div class="fft-wrap hidden" id="fftPanel">
+            <canvas id="fftCanvas"></canvas>
+            <div class="fft-label">FFT Spectrum</div>
+        </div>
+    </div>
+</div>
+
+<div class="statusbar">
+    <span>T/Div: <span class="highlight" id="sb-tdiv">10ms</span></span>
+    <span>CH1: <span class="highlight" id="sb-ch1vdiv">1V/div</span></span>
+    <span>CH2: <span class="highlight" id="sb-ch2vdiv">1V/div</span></span>
+    <span>Trigger: <span class="highlight" id="sb-trig">CH1 Rising 0.0V</span></span>
+    <span style="margin-left:auto">MCUScope Web v1.0 | Based on DTLScope by Desk Top Laboratories</span>
+</div>
+
+<script>
+// ============ State ============
+const channels = [
+    { enabled: true, color: '#ffdd00', wave: 'sine', freq: 10, amp: 80, offset: 0, vdiv: 1, label: 'CH1' },
+    { enabled: true, color: '#00ccff', wave: 'square', freq: 25, amp: 60, offset: 0, vdiv: 1, label: 'CH2' },
+    { enabled: false, color: '#ff6644', wave: 'triangle', freq: 15, amp: 50, offset: 0, vdiv: 1, label: 'CH3' },
+    { enabled: false, color: '#44ff88', wave: 'sawtooth', freq: 30, amp: 40, offset: 0, vdiv: 1, label: 'CH4' },
+];
+
+let running = true;
+let showFFT = false;
+let persistMode = 'off';
+let persistBuffer = null;
+let timebase = 10; // ms/div
+let triggerLevel = 0;
+let phase = 0;
+let lastTime = 0;
+let frameCount = 0;
+let fps = 60;
+
+// Canvas setup
+const canvas = document.getElementById('scopeCanvas');
+const ctx = canvas.getContext('2d');
+const fftCanvas = document.getElementById('fftCanvas');
+const fftCtx = fftCanvas.getContext('2d');
+
+function resizeCanvases() {
+    const wrap = canvas.parentElement;
+    canvas.width = wrap.clientWidth;
+    canvas.height = wrap.clientHeight;
+
+    const fftWrap = fftCanvas.parentElement;
+    fftCanvas.width = fftWrap.clientWidth;
+    fftCanvas.height = fftWrap.clientHeight;
+
+    if (persistBuffer) {
+        persistBuffer = null; // reset on resize
+    }
+}
+window.addEventListener('resize', resizeCanvases);
+resizeCanvases();
+
+// ============ Waveform Generation ============
+function generateSample(wave, t, freq, amp, offset) {
+    const period = 1.0 / freq;
+    const p = ((t % period) + period) % period / period;
+    let v = 0;
+
+    switch (wave) {
+        case 'sine':
+            v = Math.sin(2 * Math.PI * p);
+            break;
+        case 'square':
+            v = p < 0.5 ? 1 : -1;
+            break;
+        case 'triangle':
+            v = p < 0.5 ? (4 * p - 1) : (3 - 4 * p);
+            break;
+        case 'sawtooth':
+            v = 2 * p - 1;
+            break;
+        case 'noise':
+            v = (Math.random() * 2 - 1);
+            break;
+        case 'pwm':
+            v = p < 0.25 ? 1 : -1;
+            break;
+    }
+
+    return v * (amp / 100) * 4 + (offset / 100) * 4; // ±4V range
+}
+
+function generateBuffer(ch, numSamples, tStart, dt) {
+    const buf = new Float32Array(numSamples);
+    for (let i = 0; i < numSamples; i++) {
+        const t = tStart + i * dt;
+        buf[i] = generateSample(ch.wave, t, ch.freq, ch.amp, ch.offset);
+    }
+    return buf;
+}
+
+// ============ Drawing ============
+const GRID_DIVS_X = 10;
+const GRID_DIVS_Y = 8;
+
+function drawGrid(ctx, w, h) {
+    const gridStyle = document.getElementById('grid-style').value;
+    if (gridStyle === 'none') return;
+
+    const dx = w / GRID_DIVS_X;
+    const dy = h / GRID_DIVS_Y;
+
+    ctx.strokeStyle = '#1a2a3a';
+    ctx.lineWidth = 1;
+
+    if (gridStyle === 'full') {
+        ctx.beginPath();
+        for (let i = 0; i <= GRID_DIVS_X; i++) {
+            const x = Math.round(i * dx) + 0.5;
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, h);
+        }
+        for (let i = 0; i <= GRID_DIVS_Y; i++) {
+            const y = Math.round(i * dy) + 0.5;
+            ctx.moveTo(0, y);
+            ctx.lineTo(w, y);
+        }
+        ctx.stroke();
+
+        // Center cross with brighter lines
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.beginPath();
+        ctx.moveTo(Math.round(w / 2) + 0.5, 0);
+        ctx.lineTo(Math.round(w / 2) + 0.5, h);
+        ctx.moveTo(0, Math.round(h / 2) + 0.5);
+        ctx.lineTo(w, Math.round(h / 2) + 0.5);
+        ctx.stroke();
+
+        // Small ticks on center lines
+        ctx.strokeStyle = '#3a4a5a';
+        ctx.beginPath();
+        const tickLen = 4;
+        for (let i = 0; i <= GRID_DIVS_X * 5; i++) {
+            const x = Math.round(i * dx / 5) + 0.5;
+            ctx.moveTo(x, h / 2 - tickLen);
+            ctx.lineTo(x, h / 2 + tickLen);
+        }
+        for (let i = 0; i <= GRID_DIVS_Y * 5; i++) {
+            const y = Math.round(i * dy / 5) + 0.5;
+            ctx.moveTo(w / 2 - tickLen, y);
+            ctx.lineTo(w / 2 + tickLen, y);
+        }
+        ctx.stroke();
+    } else if (gridStyle === 'dots') {
+        ctx.fillStyle = '#1a2a3a';
+        for (let i = 0; i <= GRID_DIVS_X * 5; i++) {
+            for (let j = 0; j <= GRID_DIVS_Y * 5; j++) {
+                ctx.fillRect(Math.round(i * dx / 5), Math.round(j * dy / 5), 1, 1);
+            }
+        }
+    }
+}
+
+function voltToY(v, h, vdiv) {
+    const totalV = vdiv * GRID_DIVS_Y;
+    return h / 2 - (v / totalV) * h;
+}
+
+function drawWaveform(ctx, buffer, w, h, color, vdiv, lineWidth) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth || 2;
+    ctx.beginPath();
+
+    const step = buffer.length / w;
+    for (let px = 0; px < w; px++) {
+        const idx = Math.floor(px * step);
+        const y = voltToY(buffer[idx], h, vdiv);
+        if (px === 0) ctx.moveTo(px, y);
+        else ctx.lineTo(px, y);
+    }
+    ctx.stroke();
+
+    // Glow effect
+    ctx.strokeStyle = color + '40';
+    ctx.lineWidth = (lineWidth || 2) + 3;
+    ctx.beginPath();
+    for (let px = 0; px < w; px++) {
+        const idx = Math.floor(px * step);
+        const y = voltToY(buffer[idx], h, vdiv);
+        if (px === 0) ctx.moveTo(px, y);
+        else ctx.lineTo(px, y);
+    }
+    ctx.stroke();
+}
+
+function drawTriggerLevel(ctx, w, h) {
+    const src = parseInt(document.getElementById('trig-source').value);
+    const vdiv = channels[src].vdiv;
+    const y = voltToY(triggerLevel, h, vdiv);
+
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = '#e94560';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Arrow
+    ctx.fillStyle = '#e94560';
+    ctx.font = '10px monospace';
+    ctx.fillText('T', 4, y - 4);
+}
+
+function computeMeasurements(buffer, dt) {
+    if (!buffer || buffer.length === 0) return null;
+
+    let min = Infinity, max = -Infinity, sum = 0;
+    for (let i = 0; i < buffer.length; i++) {
+        if (buffer[i] < min) min = buffer[i];
+        if (buffer[i] > max) max = buffer[i];
+        sum += buffer[i];
+    }
+    const mean = sum / buffer.length;
+    const vpp = max - min;
+
+    // RMS
+    let sqSum = 0;
+    for (let i = 0; i < buffer.length; i++) {
+        sqSum += buffer[i] * buffer[i];
+    }
+    const rms = Math.sqrt(sqSum / buffer.length);
+
+    // Frequency estimation via zero crossings
+    let crossings = 0;
+    for (let i = 1; i < buffer.length; i++) {
+        if ((buffer[i - 1] - mean) * (buffer[i] - mean) < 0) crossings++;
+    }
+    const freq = crossings / (2 * buffer.length * dt);
+
+    return { min, max, vpp, mean, rms, freq };
+}
+
+// ============ FFT ============
+function computeFFT(buffer) {
+    const N = 1;
+    let n = buffer.length;
+    while (N < n) n = n >> 1; // not quite right, let's just use a simple DFT on limited points
+    const size = Math.min(1024, buffer.length);
+    const mag = new Float32Array(size / 2);
+
+    for (let k = 0; k < size / 2; k++) {
+        let re = 0, im = 0;
+        for (let n = 0; n < size; n++) {
+            const angle = -2 * Math.PI * k * n / size;
+            re += buffer[n] * Math.cos(angle);
+            im += buffer[n] * Math.sin(angle);
+        }
+        mag[k] = Math.sqrt(re * re + im * im) / size;
+    }
+    return mag;
+}
+
+function drawFFT(fftCtx, mag, w, h, color) {
+    if (!mag || mag.length === 0) return;
+
+    let maxMag = 0;
+    for (let i = 1; i < mag.length; i++) {
+        if (mag[i] > maxMag) maxMag = mag[i];
+    }
+    if (maxMag === 0) maxMag = 1;
+
+    const barW = w / mag.length;
+
+    fftCtx.fillStyle = color + '80';
+    fftCtx.strokeStyle = color;
+    fftCtx.lineWidth = 1;
+    fftCtx.beginPath();
+
+    for (let i = 0; i < mag.length; i++) {
+        const x = i * barW;
+        const barH = (mag[i] / maxMag) * (h - 20);
+        fftCtx.moveTo(x, h);
+        fftCtx.lineTo(x, h - barH);
+    }
+    fftCtx.stroke();
+}
+
+// ============ Math channel ============
+function computeMath(buf1, buf2, op) {
+    if (!buf1 || !buf2) return null;
+    const len = Math.min(buf1.length, buf2.length);
+    const result = new Float32Array(len);
+    for (let i = 0; i < len; i++) {
+        switch (op) {
+            case 'add': result[i] = buf1[i] + buf2[i]; break;
+            case 'sub': result[i] = buf1[i] - buf2[i]; break;
+            case 'mult': result[i] = buf1[i] * buf2[i]; break;
+        }
+    }
+    return result;
+}
+
+// ============ Main Render Loop ============
+let buffers = [null, null, null, null];
+
+function render(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    const dt = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+
+    frameCount++;
+    if (frameCount % 30 === 0) {
+        fps = Math.round(1 / dt);
+        document.getElementById('fpsDisplay').textContent = 'FPS: ' + fps;
+    }
+
+    const w = canvas.width;
+    const h = canvas.height;
+
+    if (running) {
+        phase += dt;
+    }
+
+    // Generate sample buffers
+    const numSamples = 2048;
+    const totalTime = timebase * GRID_DIVS_X / 1000; // seconds
+    const sampleDt = totalTime / numSamples;
+
+    for (let i = 0; i < 4; i++) {
+        if (channels[i].enabled) {
+            buffers[i] = generateBuffer(channels[i], numSamples, phase, sampleDt);
+        }
+    }
+
+    // Persistence
+    if (persistMode === 'off') {
+        ctx.fillStyle = '#0a0a1a';
+        ctx.fillRect(0, 0, w, h);
+    } else if (persistMode === 'low') {
+        ctx.fillStyle = 'rgba(10, 10, 26, 0.3)';
+        ctx.fillRect(0, 0, w, h);
+    } else if (persistMode === 'high') {
+        ctx.fillStyle = 'rgba(10, 10, 26, 0.08)';
+        ctx.fillRect(0, 0, w, h);
+    }
+    // infinite = don't clear
+
+    drawGrid(ctx, w, h);
+
+    // Draw channels
+    for (let i = 0; i < 4; i++) {
+        if (channels[i].enabled && buffers[i]) {
+            drawWaveform(ctx, buffers[i], w, h, channels[i].color, channels[i].vdiv);
+        }
+    }
+
+    // Math
+    const mathOp = document.getElementById('math-op').value;
+    if (mathOp !== 'none' && buffers[0] && buffers[1]) {
+        const mathBuf = computeMath(buffers[0], buffers[1], mathOp);
+        if (mathBuf) {
+            drawWaveform(ctx, mathBuf, w, h, '#ff88ff', channels[0].vdiv, 1.5);
+        }
+    }
+
+    // Trigger level
+    drawTriggerLevel(ctx, w, h);
+
+    // Measurements
+    let measHTML = '';
+    const measColors = ['meas-ch1', 'meas-ch2', 'meas-ch3', 'meas-ch4'];
+    for (let i = 0; i < 4; i++) {
+        if (channels[i].enabled && buffers[i]) {
+            const m = computeMeasurements(buffers[i], sampleDt);
+            if (m) {
+                measHTML += `<div class="${measColors[i]}"><b>${channels[i].label}</b>`;
+                measHTML += ` Vpp:${m.vpp.toFixed(2)}V`;
+                measHTML += ` RMS:${m.rms.toFixed(2)}V`;
+                measHTML += ` f:${m.freq.toFixed(1)}Hz</div>`;
+            }
+        }
+    }
+    document.getElementById('measurements').innerHTML = measHTML;
+
+    // FFT
+    if (showFFT) {
+        const fw = fftCanvas.width;
+        const fh = fftCanvas.height;
+        fftCtx.fillStyle = '#0a0a1a';
+        fftCtx.fillRect(0, 0, fw, fh);
+
+        // FFT grid
+        fftCtx.strokeStyle = '#1a2a3a';
+        fftCtx.lineWidth = 1;
+        fftCtx.beginPath();
+        for (let i = 0; i <= 10; i++) {
+            const x = Math.round(i * fw / 10) + 0.5;
+            fftCtx.moveTo(x, 0);
+            fftCtx.lineTo(x, fh);
+        }
+        for (let i = 0; i <= 4; i++) {
+            const y = Math.round(i * fh / 4) + 0.5;
+            fftCtx.moveTo(0, y);
+            fftCtx.lineTo(fw, y);
+        }
+        fftCtx.stroke();
+
+        for (let i = 0; i < 4; i++) {
+            if (channels[i].enabled && buffers[i]) {
+                const mag = computeFFT(buffers[i]);
+                drawFFT(fftCtx, mag, fw, fh, channels[i].color);
+            }
+        }
+    }
+
+    requestAnimationFrame(render);
+}
+
+requestAnimationFrame(render);
+
+// ============ UI Handlers ============
+function toggleRun() {
+    running = !running;
+    const btn = document.getElementById('btnRun');
+    btn.textContent = running ? '▶ Run' : '⏸ Stop';
+    btn.classList.toggle('active', running);
+}
+
+function singleTrigger() {
+    running = true;
+    setTimeout(() => { running = false; }, 100);
+}
+
+function toggleChannel(idx) {
+    channels[idx].enabled = !channels[idx].enabled;
+    const btns = document.querySelectorAll('.ch-btn');
+    btns[idx].classList.toggle('active', channels[idx].enabled);
+    btns[idx].classList.toggle('inactive', !channels[idx].enabled);
+}
+
+function updateChannel(idx) {
+    const prefix = `ch${idx + 1}`;
+    const ch = channels[idx];
+
+    ch.wave = document.getElementById(`${prefix}-wave`).value;
+    ch.freq = parseInt(document.getElementById(`${prefix}-freq`).value);
+    ch.amp = parseInt(document.getElementById(`${prefix}-amp`).value);
+    ch.offset = parseInt(document.getElementById(`${prefix}-offset`).value);
+    ch.vdiv = parseFloat(document.getElementById(`${prefix}-vdiv`).value);
+
+    document.getElementById(`${prefix}-freq-val`).textContent = ch.freq + ' Hz';
+    document.getElementById(`${prefix}-amp-val`).textContent = (ch.amp / 100 * 4).toFixed(1) + 'V';
+    document.getElementById(`${prefix}-offset-val`).textContent = (ch.offset / 100 * 4).toFixed(1) + 'V';
+
+    // Update status bar
+    document.getElementById(`sb-ch${idx + 1}vdiv`).textContent = ch.vdiv + 'V/div';
+}
+
+function updateTimebase() {
+    timebase = parseInt(document.getElementById('timebase').value);
+    document.getElementById('sb-tdiv').textContent = timebase + 'ms';
+
+    const sr = Math.round(2048 / (timebase * GRID_DIVS_X / 1000));
+    let srText;
+    if (sr >= 1e6) srText = (sr / 1e6).toFixed(1) + ' MSa/s';
+    else if (sr >= 1e3) srText = (sr / 1e3).toFixed(1) + ' kSa/s';
+    else srText = sr + ' Sa/s';
+    document.getElementById('sampleRateDisplay').textContent = srText;
+}
+
+function updateTrigger() {
+    const level = parseInt(document.getElementById('trig-level').value);
+    triggerLevel = level / 100 * 4;
+    document.getElementById('trig-level-val').textContent = triggerLevel.toFixed(1) + 'V';
+
+    const srcIdx = document.getElementById('trig-source').value;
+    const edge = document.getElementById('trig-edge').value;
+    const srcLabel = channels[parseInt(srcIdx)].label;
+    document.getElementById('sb-trig').textContent = `${srcLabel} ${edge === 'rising' ? 'Rising' : 'Falling'} ${triggerLevel.toFixed(1)}V`;
+}
+
+function toggleFFT() {
+    showFFT = !showFFT;
+    document.getElementById('fftPanel').classList.toggle('hidden', !showFFT);
+    document.getElementById('btnFFT').textContent = showFFT ? 'Hide FFT' : 'Show FFT';
+    document.getElementById('btnFFT').classList.toggle('active', showFFT);
+    setTimeout(resizeCanvases, 50);
+}
+
+function updatePersist() {
+    persistMode = document.getElementById('persist-mode').value;
+}
+
+// ============ Export ============
+function exportCSV() {
+    let csv = 'Sample';
+    for (let i = 0; i < 4; i++) {
+        if (channels[i].enabled) csv += ',' + channels[i].label;
+    }
+    csv += '\n';
+
+    const numSamples = buffers[0] ? buffers[0].length : 0;
+    for (let s = 0; s < numSamples; s++) {
+        csv += s;
+        for (let i = 0; i < 4; i++) {
+            if (channels[i].enabled && buffers[i]) {
+                csv += ',' + buffers[i][s].toFixed(6);
+            }
+        }
+        csv += '\n';
+    }
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'mcuscope_data.csv';
+    a.click();
+}
+
+function exportScreenshot() {
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = 'mcuscope_screenshot.png';
+    a.click();
+}
+
+// Initialize displays
+updateChannel(0);
+updateChannel(1);
+updateTimebase();
+updateTrigger();
+</script>
+
+</body>
+</html>
