@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCUScope v2.0</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* Inline critical loading styles */
+        .loading-screen {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: #0a0e14; display: flex; align-items: center;
+            justify-content: center; flex-direction: column; gap: 16px; z-index: 9999;
+        }
+        .loading-screen .spinner {
+            width: 40px; height: 40px; border: 3px solid #1a2230;
+            border-top-color: #00aaff; border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-screen .text { color: #556677; font-family: Inter, sans-serif; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loading-screen">
+        <div class="spinner"></div>
+        <div class="text">Initializing MCUScope...</div>
+    </div>
+
+    <div id="app">
+        <!-- Toolbar -->
+        <div id="toolbar">
+            <div class="logo">MCUScope <span>v2.0</span></div>
+
+            <div class="toolbar-group">
+                <button class="toolbar-btn run-btn" id="btn-run">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                        <polygon points="2,0 12,6 2,12"/>
+                    </svg>
+                    Run
+                </button>
+                <button class="toolbar-btn stop-btn" id="btn-stop">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                        <rect x="1" y="1" width="10" height="10"/>
+                    </svg>
+                    Stop
+                </button>
+                <button class="toolbar-btn" id="btn-single">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                        <rect x="1" y="1" width="4" height="10"/>
+                        <polygon points="8,0 12,6 8,12"/>
+                    </svg>
+                    Single
+                </button>
+            </div>
+
+            <div class="toolbar-group">
+                <button class="toolbar-btn" id="btn-fft">FFT</button>
+                <button class="toolbar-btn" id="btn-cursors">Cursors</button>
+            </div>
+
+            <div class="toolbar-group">
+                <button class="toolbar-btn" id="btn-connect">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                        <circle cx="6" cy="6" r="2"/>
+                        <path d="M6 0v2M6 10v2M0 6h2M10 6h2" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                    </svg>
+                    Connect
+                </button>
+            </div>
+
+            <div class="connection-status">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">Disconnected</span>
+            </div>
+        </div>
+
+        <!-- Left Panel -->
+        <div id="left-panel">
+            <!-- Channels -->
+            <div class="panel-section">
+                <div class="panel-header">
+                    Channels <span class="chevron">&#9660;</span>
+                </div>
+                <div class="panel-content" id="channel-list">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Acquisition Settings -->
+            <div class="panel-section">
+                <div class="panel-header">
+                    Acquisition <span class="chevron">&#9660;</span>
+                </div>
+                <div class="panel-content">
+                    <div class="ctrl-row">
+                        <span class="ctrl-label">Rate</span>
+                        <select class="ctrl-select" id="sample-rate">
+                            <option value="1000">1 kSa/s</option>
+                            <option value="5000">5 kSa/s</option>
+                            <option value="10000" selected>10 kSa/s</option>
+                            <option value="50000">50 kSa/s</option>
+                            <option value="100000">100 kSa/s</option>
+                            <option value="500000">500 kSa/s</option>
+                            <option value="1000000">1 MSa/s</option>
+                        </select>
+                    </div>
+                    <div class="ctrl-row">
+                        <span class="ctrl-label">Buffer</span>
+                        <select class="ctrl-select" id="buffer-size">
+                            <option value="256">256</option>
+                            <option value="512">512</option>
+                            <option value="1024" selected>1024</option>
+                            <option value="2048">2048</option>
+                            <option value="4096">4096</option>
+                            <option value="8192">8192</option>
+                        </select>
+                    </div>
+                    <div class="ctrl-row">
+                        <span class="ctrl-label">Time/Div</span>
+                        <select class="ctrl-select" id="time-per-div">
+                            <option value="0.000001">1 &micro;s</option>
+                            <option value="0.00001">10 &micro;s</option>
+                            <option value="0.0001">100 &micro;s</option>
+                            <option value="0.001">1 ms</option>
+                            <option value="0.01" selected>10 ms</option>
+                            <option value="0.1">100 ms</option>
+                            <option value="1">1 s</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trigger -->
+            <div class="panel-section">
+                <div class="panel-header">
+                    Trigger <span class="chevron">&#9660;</span>
+                </div>
+                <div class="panel-content">
+                    <div class="ctrl-row">
+                        <span class="ctrl-label">Enable</span>
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                            <input type="checkbox" id="trigger-enable">
+                            <span style="font-size:11px;color:var(--text-secondary)">Off</span>
+                        </label>
+                    </div>
+                    <div class="ctrl-row">
+                        <span class="ctrl-label">Source</span>
+                        <select class="ctrl-select" id="trigger-channel">
+                            <option value="0">CH1</option>
+                            <option value="1">CH2</option>
+                            <option value="2">CH3</option>
+                            <option value="3">CH4</option>
+                        </select>
+                    </div>
+                    <div class="ctrl-row">
+                        <span class="ctrl-label">Level</span>
+                        <input type="number" class="ctrl-input" id="trigger-level"
+                               value="0" step="0.1">
+                    </div>
+                    <div class="ctrl-row">
+                        <span class="ctrl-label">Edge</span>
+                        <select class="ctrl-select" id="trigger-edge">
+                            <option value="rising">Rising</option>
+                            <option value="falling">Falling</option>
+                            <option value="both">Both</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FFT Settings -->
+            <div class="panel-section">
+                <div class="panel-header">
+                    FFT Analysis <span class="chevron">&#9660;</span>
+                </div>
+                <div class="panel-content">
+                    <div class="ctrl-row">
+                        <span class="ctrl-label">Source</span>
+                        <select class="ctrl-select" id="fft-source">
+                            <option value="0">CH1</option>
+                            <option value="1">CH2</option>
+                            <option value="2">CH3</option>
+                            <option value="3">CH4</option>
+                        </select>
+                    </div>
+                    <div class="ctrl-row">
+                        <span class="ctrl-label">Window</span>
+                        <select class="ctrl-select" id="fft-window">
+                            <option value="hamming" selected>Hamming</option>
+                            <option value="hanning">Hanning</option>
+                            <option value="blackman">Blackman</option>
+                            <option value="blackman_harris">Blackman-Harris</option>
+                            <option value="flat_top">Flat Top</option>
+                            <option value="rectangular">Rectangular</option>
+                            <option value="kaiser_5">Kaiser (&beta;=5)</option>
+                            <option value="kaiser_10">Kaiser (&beta;=10)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Scope Area -->
+        <div id="main-area">
+            <div id="scope-container">
+                <div class="scope-canvas-wrap">
+                    <canvas id="scope-canvas"></canvas>
+                    <canvas id="overlay-canvas"></canvas>
+                    <canvas id="cursor-canvas"></canvas>
+                </div>
+                <div class="time-axis-bar">
+                    <span>Time Base</span>
+                </div>
+            </div>
+            <div id="fft-container">
+                <div class="fft-resize-handle"></div>
+                <canvas id="fft-canvas"></canvas>
+            </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div id="right-panel">
+            <!-- Measurements -->
+            <div class="panel-section">
+                <div class="panel-header">
+                    Measurements <span class="chevron">&#9660;</span>
+                </div>
+                <div class="panel-content" id="measurements">
+                    <div style="color:#556677;font-size:11px">Press Run to start</div>
+                </div>
+            </div>
+
+            <!-- Cursor Info -->
+            <div class="panel-section">
+                <div class="panel-header">
+                    Cursor Info <span class="chevron">&#9660;</span>
+                </div>
+                <div class="panel-content" id="cursor-info">
+                    <div style="color:#556677;font-size:11px">Cursors off (press C)</div>
+                </div>
+            </div>
+
+            <!-- Signal Info -->
+            <div class="panel-section">
+                <div class="panel-header">
+                    Signal Info <span class="chevron">&#9660;</span>
+                </div>
+                <div class="panel-content" id="signal-info">
+                    <div class="ctrl-row">
+                        <span class="ctrl-label" style="min-width:auto">CH1:</span>
+                        <span style="font-size:11px;color:#00dd88">Sine 50Hz, 3.3Vpp</span>
+                    </div>
+                    <div class="ctrl-row">
+                        <span class="ctrl-label" style="min-width:auto">CH2:</span>
+                        <span style="font-size:11px;color:#00aaff">Square 100Hz, 5.0V</span>
+                    </div>
+                    <div class="ctrl-row">
+                        <span class="ctrl-label" style="min-width:auto">CH3:</span>
+                        <span style="font-size:11px;color:#ffcc00">Triangle 25Hz, 2.5V</span>
+                    </div>
+                    <div class="ctrl-row">
+                        <span class="ctrl-label" style="min-width:auto">CH4:</span>
+                        <span style="font-size:11px;color:#ff4466">Composite 30+90+150Hz</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Keyboard Shortcuts -->
+            <div class="panel-section">
+                <div class="panel-header collapsed">
+                    Shortcuts <span class="chevron">&#9660;</span>
+                </div>
+                <div class="panel-content collapsed" style="font-size:11px;color:var(--text-secondary)">
+                    <div class="ctrl-row"><kbd style="color:var(--text-primary)">Space</kbd> <span>Run/Stop</span></div>
+                    <div class="ctrl-row"><kbd style="color:var(--text-primary)">F</kbd> <span>Toggle FFT</span></div>
+                    <div class="ctrl-row"><kbd style="color:var(--text-primary)">C</kbd> <span>Toggle Cursors</span></div>
+                    <div class="ctrl-row"><kbd style="color:var(--text-primary)">1-8</kbd> <span>Toggle Channel</span></div>
+                    <div class="ctrl-row"><kbd style="color:var(--text-primary)">Scroll</kbd> <span>Zoom Time</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div id="status-bar">
+            <div class="status-item">
+                <span class="label">Mode:</span>
+                <span class="value" id="status-mode" style="color:#ff4466">STOP</span>
+            </div>
+            <div class="status-item">
+                <span class="label">Rate:</span>
+                <span class="value" id="status-sps">10.0 kSa/s</span>
+            </div>
+            <div class="status-item">
+                <span class="label">Samples:</span>
+                <span class="value" id="status-samples">0</span>
+            </div>
+            <div class="status-item">
+                <span class="label">FPS:</span>
+                <span class="value" id="status-fps">0 fps</span>
+            </div>
+            <div class="status-spacer"></div>
+            <div class="status-item">
+                <span class="value" style="color:var(--text-muted)">MCUScope v2.0</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/scope-renderer.js"></script>
+    <script src="/js/app.js"></script>
+    <script>
+        // Hide loading screen
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const ls = document.getElementById('loading-screen');
+                ls.style.opacity = '0';
+                ls.style.transition = 'opacity 0.3s';
+                setTimeout(() => ls.remove(), 300);
+            }, 500);
+        });
+    </script>
+</body>
+</html>
