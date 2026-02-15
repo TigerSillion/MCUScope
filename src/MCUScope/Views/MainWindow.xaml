@@ -1,0 +1,391 @@
+<Window x:Class="MCUScope.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:oxy="http://oxyplot.org/wpf"
+        xmlns:vm="clr-namespace:MCUScope.ViewModels"
+        xmlns:conv="clr-namespace:MCUScope.Converters"
+        mc:Ignorable="d"
+        Title="MCUScope" Height="800" Width="1300"
+        WindowStartupLocation="CenterScreen"
+        WindowState="Maximized">
+    <Window.DataContext>
+        <vm:MainViewModel/>
+    </Window.DataContext>
+    <Window.Resources>
+        <conv:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVisConverter"/>
+    </Window.Resources>
+
+    <DockPanel>
+        <!-- Menu Bar -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="_New" InputGestureText="Ctrl+N" Command="{Binding NewProjectCommand}"/>
+                <MenuItem Header="_Open" InputGestureText="Ctrl+O" Command="{Binding OpenProjectCommand}"/>
+                <MenuItem Header="_Save" InputGestureText="Ctrl+S" Command="{Binding SaveProjectCommand}"/>
+                <MenuItem Header="Save _As" Command="{Binding SaveProjectAsCommand}"/>
+                <Separator/>
+                <MenuItem Header="Load _Variables" Command="{Binding LoadVariablesCommand}"/>
+                <MenuItem Header="_Update Variables" Command="{Binding UpdateVariablesCommand}"/>
+                <Separator/>
+                <MenuItem Header="Save _Chart Data" Command="{Binding SaveChartDataCommand}"/>
+                <MenuItem Header="Load Chart _Data" Command="{Binding LoadChartDataCommand}"/>
+                <Separator/>
+                <MenuItem Header="_Close" Click="OnClose"/>
+            </MenuItem>
+            <MenuItem Header="_Settings">
+                <MenuItem Header="_Variables Settings" Click="OnVariableSettings"/>
+                <MenuItem Header="_Communication Settings" Click="OnCommunicationSettings"/>
+            </MenuItem>
+            <MenuItem Header="_Tools">
+                <MenuItem Header="_Array Editor" Click="OnArrayEditor"/>
+                <MenuItem Header="_Custom Control Panel" Click="OnCustomControlPanel"/>
+                <MenuItem Header="_Timetable Player" Click="OnTimetablePlayer"/>
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_About MCUScope" Click="OnAbout"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- Toolbar -->
+        <ToolBarTray DockPanel.Dock="Top">
+            <ToolBar>
+                <ComboBox ItemsSource="{Binding AvailablePorts}" SelectedItem="{Binding SelectedPort}"
+                          Width="100" Margin="2"/>
+                <Button Content="Connect" Command="{Binding ConnectPortCommand}" Margin="2"/>
+                <Button Content="Disconnect" Command="{Binding DisconnectPortCommand}" Margin="2"/>
+                <Separator/>
+                <Button Content="Update Variables" Command="{Binding UpdateVariablesCommand}" Margin="2"/>
+            </ToolBar>
+        </ToolBarTray>
+
+        <!-- Status Bar -->
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusText}"/>
+            </StatusBarItem>
+        </StatusBar>
+
+        <!-- Main Content -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220" MinWidth="150"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="220" MinWidth="180"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left Panel: Watch Window -->
+            <DockPanel Grid.Column="0">
+                <TextBlock DockPanel.Dock="Top" Text="Watch" FontWeight="Bold" Margin="4,4,4,2"/>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="4,2">
+                    <Button Content="Read" Command="{Binding ReadWatchVariablesCommand}"
+                            Style="{StaticResource ToolButton}" Width="45" MinWidth="40"/>
+                    <Button Content="Write" Command="{Binding WriteWatchVariablesCommand}"
+                            Style="{StaticResource ToolButton}" Width="45" MinWidth="40"/>
+                    <Button Content="Auto Read" Command="{Binding ToggleAutoReadCommand}"
+                            Style="{StaticResource ToolButton}" Width="65" MinWidth="60"/>
+                    <TextBox Text="{Binding AutoReadInterval}" Width="30" Margin="2"
+                             VerticalContentAlignment="Center"/>
+                    <TextBlock Text="s" VerticalAlignment="Center"/>
+                </StackPanel>
+                <DataGrid ItemsSource="{Binding WatchItems}" Style="{StaticResource ScopeDataGrid}"
+                          Margin="4" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                    <DataGrid.Columns>
+                        <DataGridComboBoxColumn Header="Name" Width="80"
+                            SelectedItemBinding="{Binding Name}"
+                            ItemsSource="{Binding DataContext.VariableNames, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                        <DataGridCheckBoxColumn Header="R" Width="25" Binding="{Binding ReadEnabled}"/>
+                        <DataGridTextColumn Header="Read Value" Width="70" Binding="{Binding ReadValue}" IsReadOnly="True"/>
+                        <DataGridCheckBoxColumn Header="W" Width="25" Binding="{Binding WriteEnabled}"/>
+                        <DataGridTextColumn Header="Write Value" Width="70" Binding="{Binding WriteValue}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+
+            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                          Background="{StaticResource BorderBrush}"/>
+
+            <!-- Center Panel: Scope Charts -->
+            <DockPanel Grid.Column="2">
+                <TabControl DockPanel.Dock="Top" Height="*" Margin="4">
+                    <!-- Main Scope Chart Tab -->
+                    <TabItem Header="Scope Chart">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Margin="4,2"
+                                       Text="{Binding MainPlotModel.Title}" FontSize="10" Foreground="Gray"/>
+                            <oxy:PlotView Model="{Binding MainPlotModel}" Background="Black"/>
+                        </DockPanel>
+                    </TabItem>
+
+                    <!-- Zoom Tab -->
+                    <TabItem Header="Zoom">
+                        <oxy:PlotView Model="{Binding ZoomPlotModel}" Background="Black"/>
+                    </TabItem>
+
+                    <!-- FFT Tab -->
+                    <TabItem Header="FFT">
+                        <oxy:PlotView Model="{Binding FftPlotModel}" Background="Black"/>
+                    </TabItem>
+                </TabControl>
+
+                <!-- Cursor Info -->
+                <TextBlock DockPanel.Dock="Top" Text="{Binding CursorInfoText}" Margin="4,0"
+                           FontSize="10" Foreground="Gray"/>
+
+                <!-- Scope Values Window -->
+                <DataGrid DockPanel.Dock="Bottom" ItemsSource="{Binding ScopeValues}"
+                          Style="{StaticResource ScopeDataGrid}" Height="120"
+                          Margin="4" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="" Width="30" Binding="{Binding ChannelId}" IsReadOnly="True"/>
+                        <DataGridCheckBoxColumn Header="V" Width="25" Binding="{Binding Visible}"/>
+                        <DataGridTemplateColumn Header="Color" Width="40">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Rectangle Fill="{Binding Color, Converter={StaticResource ColorToBrushConverter}}"
+                                               Width="30" Height="14"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridComboBoxColumn Header="Name" Width="80"
+                            SelectedItemBinding="{Binding VariableName}"
+                            ItemsSource="{Binding DataContext.VariableNames, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                        <DataGridTextColumn Header="Val/Div" Width="60" Binding="{Binding ValPerDiv}"/>
+                        <DataGridTextColumn Header="Position" Width="60" Binding="{Binding Position, StringFormat={}{0:F2}%}"/>
+                        <DataGridTextColumn Header="Offset" Width="55" Binding="{Binding Offset}"/>
+                        <DataGridTextColumn Header="Min" Width="60" Binding="{Binding Min, StringFormat={}{0:G4}}" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Max" Width="60" Binding="{Binding Max, StringFormat={}{0:G4}}" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Average" Width="60" Binding="{Binding Average, StringFormat={}{0:G4}}" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="CursorX1" Width="60" Binding="{Binding CursorX1, StringFormat={}{0:G4}}" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="CursorX2" Width="60" Binding="{Binding CursorX2, StringFormat={}{0:G4}}" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="X1-X2" Width="60" Binding="{Binding X1MinusX2, StringFormat={}{0:G4}}" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="CursorY1" Width="60" Binding="{Binding CursorY1, StringFormat={}{0:G4}}" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="CursorY2" Width="60" Binding="{Binding CursorY2, StringFormat={}{0:G4}}" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Y1-Y2" Width="60" Binding="{Binding Y1MinusY2, StringFormat={}{0:G4}}" IsReadOnly="True"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+
+            <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                          Background="{StaticResource BorderBrush}"/>
+
+            <!-- Right Panel: Scope Controls -->
+            <ScrollViewer Grid.Column="4" VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="4">
+                    <TextBlock Text="Scope Controls" FontWeight="Bold" Margin="0,4,0,4"/>
+
+                    <!-- Run/Stop -->
+                    <GroupBox Header="Run" Style="{StaticResource ScopeGroupBox}">
+                        <StackPanel>
+                            <Button Content="Run" Command="{Binding RunScopeCommand}"
+                                    Style="{StaticResource ToolButton}"/>
+                            <Button Content="Stop" Command="{Binding StopScopeCommand}"
+                                    Style="{StaticResource ToolButton}"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Time -->
+                    <GroupBox Header="Time" Style="{StaticResource ScopeGroupBox}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Mode" Style="{StaticResource ScopeLabel}"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1" Style="{StaticResource ScopeCombo}"
+                                      SelectedItem="{Binding TimeMode}" Width="Auto">
+                                <ComboBoxItem Content="Buffer"/>
+                                <ComboBoxItem Content="Roll"/>
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Sec/Div" Style="{StaticResource ScopeLabel}"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" Style="{StaticResource ScopeSpinner}"
+                                     Text="{Binding SecPerDiv, StringFormat={}{0:G4}}" Width="Auto"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Sample" Style="{StaticResource ScopeLabel}"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" Style="{StaticResource ScopeSpinner}"
+                                     Text="{Binding SamplePeriod, StringFormat={}{0:G4}}" Width="Auto"/>
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Length" Style="{StaticResource ScopeLabel}"/>
+                            <TextBox Grid.Row="3" Grid.Column="1" Style="{StaticResource ScopeSpinner}"
+                                     Text="{Binding RecordLength}" IsReadOnly="True" Width="Auto"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- Trigger -->
+                    <GroupBox Header="Trigger" Style="{StaticResource ScopeGroupBox}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Position" Style="{StaticResource ScopeLabel}"/>
+                            <TextBox Grid.Row="0" Grid.Column="1" Style="{StaticResource ScopeSpinner}"
+                                     Text="{Binding TriggerPosition, StringFormat={}{0:F2}%}" Width="Auto"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Level" Style="{StaticResource ScopeLabel}"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" Style="{StaticResource ScopeSpinner}"
+                                     Text="{Binding TriggerLevel, StringFormat={}{0:G4}}" Width="Auto"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Source" Style="{StaticResource ScopeLabel}"/>
+                            <ComboBox Grid.Row="2" Grid.Column="1" Style="{StaticResource ScopeCombo}"
+                                      SelectedItem="{Binding TriggerSource}" Width="Auto"
+                                      ItemsSource="{Binding Source={x:Static vm:EnumValues.TriggerSources}}"/>
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Mode" Style="{StaticResource ScopeLabel}"/>
+                            <ComboBox Grid.Row="3" Grid.Column="1" Style="{StaticResource ScopeCombo}"
+                                      SelectedItem="{Binding TriggerMode}" Width="Auto"
+                                      ItemsSource="{Binding Source={x:Static vm:EnumValues.TriggerModes}}"/>
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Edge" Style="{StaticResource ScopeLabel}"/>
+                            <ComboBox Grid.Row="4" Grid.Column="1" Style="{StaticResource ScopeCombo}"
+                                      SelectedItem="{Binding TriggerEdge}" Width="Auto"
+                                      ItemsSource="{Binding Source={x:Static vm:EnumValues.TriggerEdges}}"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- Channel (selected channel settings) -->
+                    <GroupBox Header="Channel" Style="{StaticResource ScopeGroupBox}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Ch" Style="{StaticResource ScopeLabel}"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1" x:Name="ChannelSelector" Width="Auto"
+                                      Style="{StaticResource ScopeCombo}"
+                                      ItemsSource="{Binding ScopeValues}"
+                                      DisplayMemberPath="ChannelId" SelectedIndex="0"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Name" Style="{StaticResource ScopeLabel}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource ScopeLabel}"
+                                       Text="{Binding SelectedItem.VariableName, ElementName=ChannelSelector}"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Val/Div" Style="{StaticResource ScopeLabel}"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" Style="{StaticResource ScopeSpinner}" Width="Auto"
+                                     Text="{Binding SelectedItem.ValPerDiv, ElementName=ChannelSelector, StringFormat={}{0:G4}}"/>
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Position" Style="{StaticResource ScopeLabel}"/>
+                            <TextBox Grid.Row="3" Grid.Column="1" Style="{StaticResource ScopeSpinner}" Width="Auto"
+                                     Text="{Binding SelectedItem.Position, ElementName=ChannelSelector, StringFormat={}{0:F2}%}"/>
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Offset" Style="{StaticResource ScopeLabel}"/>
+                            <TextBox Grid.Row="4" Grid.Column="1" Style="{StaticResource ScopeSpinner}" Width="Auto"
+                                     Text="{Binding SelectedItem.Offset, ElementName=ChannelSelector, StringFormat={}{0:G4}}"/>
+
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Visible" Style="{StaticResource ScopeLabel}"/>
+                            <CheckBox Grid.Row="5" Grid.Column="1" Margin="4,2"
+                                      IsChecked="{Binding SelectedItem.Visible, ElementName=ChannelSelector}"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- Cursor -->
+                    <GroupBox Header="Cursor" Style="{StaticResource ScopeGroupBox}">
+                        <StackPanel>
+                            <CheckBox Content="CursorX1" IsChecked="{Binding CursorX1Enabled}" Margin="4,2"/>
+                            <CheckBox Content="CursorX2" IsChecked="{Binding CursorX2Enabled}" Margin="4,2"/>
+                            <CheckBox Content="CursorY1" IsChecked="{Binding CursorY1Enabled}" Margin="4,2"/>
+                            <CheckBox Content="CursorY2" IsChecked="{Binding CursorY2Enabled}" Margin="4,2"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Zoom -->
+                    <GroupBox Header="Zoom" Style="{StaticResource ScopeGroupBox}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/><RowDefinition/><RowDefinition/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Cursor" Style="{StaticResource ScopeLabel}"/>
+                            <CheckBox Grid.Row="0" Grid.Column="1" IsChecked="{Binding ZoomCursorEnabled}" Margin="4,2"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Sec/Div" Style="{StaticResource ScopeLabel}"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" Style="{StaticResource ScopeSpinner}" Width="Auto"
+                                     Text="{Binding ZoomSecPerDiv, StringFormat={}{0:G4}}"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Position" Style="{StaticResource ScopeLabel}"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" Style="{StaticResource ScopeSpinner}" Width="Auto"
+                                     Text="{Binding ZoomPosition, StringFormat={}{0:F2}%}"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- Save -->
+                    <GroupBox Header="Save" Style="{StaticResource ScopeGroupBox}">
+                        <StackPanel>
+                            <Button Content="Save" Command="{Binding SaveChartDataCommand}"
+                                    Style="{StaticResource ToolButton}"/>
+                            <Button Content="Load" Command="{Binding LoadChartDataCommand}"
+                                    Style="{StaticResource ToolButton}"/>
+                            <CheckBox Content="Auto Save" IsChecked="{Binding AutoSaveEnabled}" Margin="4,2"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- FFT -->
+                    <GroupBox Header="FFT" Style="{StaticResource ScopeGroupBox}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Enabled" Style="{StaticResource ScopeLabel}"/>
+                            <CheckBox Grid.Row="0" Grid.Column="1" IsChecked="{Binding FftEnabled}" Margin="4,2"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Source" Style="{StaticResource ScopeLabel}"/>
+                            <ComboBox Grid.Row="1" Grid.Column="1" Style="{StaticResource ScopeCombo}" Width="Auto"
+                                      SelectedItem="{Binding FftSource}">
+                                <ComboBoxItem Content="All"/>
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Scope" Style="{StaticResource ScopeLabel}"/>
+                            <ComboBox Grid.Row="2" Grid.Column="1" Style="{StaticResource ScopeCombo}" Width="Auto"
+                                      SelectedItem="{Binding FftScope}">
+                                <ComboBoxItem Content="All"/>
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Window" Style="{StaticResource ScopeLabel}"/>
+                            <ComboBox Grid.Row="3" Grid.Column="1" Style="{StaticResource ScopeCombo}" Width="Auto"
+                                      SelectedItem="{Binding FftWindow}">
+                                <ComboBoxItem Content="Hann"/>
+                                <ComboBoxItem Content="Hamming"/>
+                                <ComboBoxItem Content="Blackman"/>
+                                <ComboBoxItem Content="Rectangular"/>
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Scale" Style="{StaticResource ScopeLabel}"/>
+                            <ComboBox Grid.Row="4" Grid.Column="1" Style="{StaticResource ScopeCombo}" Width="Auto"
+                                      SelectedItem="{Binding FftScale}">
+                                <ComboBoxItem Content="Rms"/>
+                                <ComboBoxItem Content="dB"/>
+                                <ComboBoxItem Content="Peak"/>
+                            </ComboBox>
+                        </Grid>
+                    </GroupBox>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </DockPanel>
+</Window>
