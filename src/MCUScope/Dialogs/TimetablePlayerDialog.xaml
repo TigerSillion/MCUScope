@@ -1,0 +1,45 @@
+<Window x:Class="MCUScope.Dialogs.TimetablePlayerDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Timetable Player" Height="450" Width="600"
+        WindowStartupLocation="CenterOwner">
+    <DockPanel Margin="8">
+        <!-- Menu -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="_Open" Click="OnOpenFile"/>
+            </MenuItem>
+            <MenuItem Header="_Action">
+                <MenuItem Header="_Play" Click="OnPlay"/>
+                <MenuItem Header="_Stop" Click="OnStop"/>
+                <MenuItem Header="_Pause" Click="OnPause"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- Status -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="4,8">
+            <Button Content="Play" Width="60" Margin="4" Click="OnPlay"/>
+            <Button Content="Stop" Width="60" Margin="4" Click="OnStop"/>
+            <Button Content="Pause" Width="60" Margin="4" Click="OnPause"/>
+            <Separator Width="20"/>
+            <TextBlock Text="Status:" VerticalAlignment="Center" Margin="4"/>
+            <TextBlock x:Name="StatusText" Text="Stopped" VerticalAlignment="Center" FontWeight="Bold"/>
+            <Separator Width="20"/>
+            <TextBlock Text="Time:" VerticalAlignment="Center" Margin="4"/>
+            <TextBlock x:Name="CurrentTimeText" Text="0.000s" VerticalAlignment="Center"/>
+            <Separator Width="20"/>
+            <TextBlock Text="Row:" VerticalAlignment="Center" Margin="4"/>
+            <TextBlock x:Name="CurrentRowText" Text="0/0" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Info -->
+        <TextBlock DockPanel.Dock="Top" Margin="8,4" FontSize="10" Foreground="Gray" TextWrapping="Wrap"
+                   Text="Load a CSV file with time-based variable data. First column is time (seconds), remaining columns are variable values. Minimum time period is 1 second."/>
+
+        <!-- Data Preview -->
+        <DataGrid x:Name="DataPreview" AutoGenerateColumns="True"
+                  CanUserAddRows="False" CanUserDeleteRows="False"
+                  IsReadOnly="True" GridLinesVisibility="All"
+                  FontSize="11" RowHeight="22" Margin="4"/>
+    </DockPanel>
+</Window>
