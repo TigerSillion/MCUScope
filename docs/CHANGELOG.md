@@ -1,6 +1,14 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Fixed MAP loading flow for Renesas linker map files by adding a dedicated symbol-list parser and fallback parser in `VariableFileService`, so variable lists populate after `.map` import.
+- Fixed `Variables Settings` dialog to edit real variable metadata (type/scale/RW/alias/comment) and apply changes back to runtime variable definitions.
+- Added serial local status display (`Port/Baud/Local/MCU`) to the status bar and refreshed it on port refresh/select/connect/disconnect/communication setting updates.
+- Upgraded communication settings dialog to support editable arbitrary baud rates with common preset options and immediate effective-rate feedback.
+- Added Help menu entry `使用说明（中文）` and wired it to open `docs/GUI_OPERATION_MANUAL_CN.md` directly from GUI.
+- Switched auto-read interval to microseconds (`AutoReadIntervalUs`) with `1 us` minimum configuration support.
+- Updated Watch/Scope variable name columns to ComboBox templates bound to runtime variable list for reliable refresh after variable-file reload.
+- Updated `docs/GUI_OPERATION_MANUAL_CN.md` to document the new Help entry, arbitrary baud-rate operation, us-level auto-read, MAP-variable refresh behavior, and revised improvement backlog.
 - Fixed GUI startup crash caused by invalid WPF `Height="*"` on `TabControl` in `MainWindow.xaml` (XAML parse error at runtime).
 - Added free global-variable address access on MCU UART protocol (removed fixed whitelist dependency) with RAM-range safety checks in `ICS2_RX26T.c`.
 - Added dynamic scope channel binding (`slot + type + address`) so GUI channels can sample arbitrary variables instead of fixed M1..M12 source mapping.

@@ -9,9 +9,11 @@ using OxyPlot.Series;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using MathNet.Numerics;
@@ -23,7 +25,8 @@ namespace MCUScope.ViewModels
     {
         private readonly SerialCommunicationService _serialService;
         private readonly IcsProtocolService _icsService;
-        private Timer? _autoReadTimer;
+        private CancellationTokenSource? _autoReadCts;
+        private Task? _autoReadTask;
         private string _currentProjectPath = string.Empty;
 
         // Scope state
@@ -71,6 +74,7 @@ namespace MCUScope.ViewModels
 
             // Default settings
             Settings = new ProjectSettings();
+            UpdateSerialLocalStatus();
         }
 
         // Properties
@@ -113,12 +117,13 @@ namespace MCUScope.ViewModels
         [ObservableProperty] private bool _autoSaveEnabled;
 
         // Watch settings
-        [ObservableProperty] private int _autoReadInterval = 1;
+        [ObservableProperty] private int _autoReadIntervalUs = 1000;
         [ObservableProperty] private bool _isAutoReading;
 
         // COM port
         [ObservableProperty] private string _selectedPort = string.Empty;
         [ObservableProperty] private ObservableCollection<string> _availablePorts = new();
+        [ObservableProperty] private string _serialLocalStatusText = "Port: -, Baud: -, Local: Disconnected";
 
         // Cursor values display
         [ObservableProperty] private string _cursorInfoText = "X1=---s, X2=---s, dX=---s, 1/dX=---Hz";
@@ -391,11 +396,9 @@ namespace MCUScope.ViewModels
                 _icsService.Variables.AddRange(variables);
                 Settings.VariableFilePath = filePath;
 
-                VariableNames.Clear();
-                foreach (var v in variables)
-                    VariableNames.Add(v.DisplayName);
+                RebuildVariableNameList();
 
-                MessageBox.Show("Variable information has been loaded.", "Success",
+                MessageBox.Show($"Variable information loaded: {variables.Count} items.", "Success",
                     MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
@@ -490,17 +493,11 @@ namespace MCUScope.ViewModels
         {
             if (IsAutoReading)
             {
-                _autoReadTimer?.Dispose();
-                _autoReadTimer = null;
-                IsAutoReading = false;
+                StopAutoReadLoop();
             }
             else
             {
-                IsAutoReading = true;
-                _autoReadTimer = new Timer(_ =>
-                {
-                    Application.Current?.Dispatcher.Invoke(ReadWatchVariables);
-                }, null, 0, AutoReadInterval * 1000);
+                StartAutoReadLoop();
             }
         }
 
@@ -510,17 +507,24 @@ namespace MCUScope.ViewModels
             AvailablePorts.Clear();
             foreach (var port in SerialCommunicationService.GetAvailablePorts())
                 AvailablePorts.Add(port);
+
+            if (!string.IsNullOrEmpty(SelectedPort) && !AvailablePorts.Contains(SelectedPort))
+            {
+                SelectedPort = string.Empty;
+            }
+
+            UpdateSerialLocalStatus();
         }
 
         [RelayCommand]
         private void ConnectPort()
         {
             if (string.IsNullOrEmpty(SelectedPort)) return;
-            int baudRate = Settings.Communication.BaudRate > 0
-                ? Settings.Communication.BaudRate
-                : (int)(Settings.Communication.BaseClockMHz * 1_000_000 / 8);
+            int baudRate = ResolveBaudRate();
+            Settings.Communication.PortName = SelectedPort;
             _serialService.Open(SelectedPort, baudRate);
             _icsService.RequestInfo();
+            UpdateSerialLocalStatus();
         }
 
         [RelayCommand]
@@ -528,6 +532,7 @@ namespace MCUScope.ViewModels
         {
             StopScope();
             _serialService.Close();
+            UpdateSerialLocalStatus();
         }
 
         // ---- Event Handlers ----
@@ -538,6 +543,7 @@ namespace MCUScope.ViewModels
             {
                 ConnectionStatus = e.Status;
                 StatusText = e.StatusText;
+                UpdateSerialLocalStatus();
             });
         }
 
@@ -836,6 +842,12 @@ namespace MCUScope.ViewModels
                 Scale = FftScale
             };
             Settings.Save = new SaveSettings { AutoSave = AutoSaveEnabled };
+            Settings.Communication = new CommunicationSettings
+            {
+                PortName = SelectedPort,
+                BaudRate = Settings.Communication.BaudRate,
+                BaseClockMHz = Settings.Communication.BaseClockMHz
+            };
 
             Settings.Channels.Clear();
             foreach (var sv in ScopeValues)
@@ -855,6 +867,8 @@ namespace MCUScope.ViewModels
 
         private void ApplySettings(ProjectSettings settings)
         {
+            settings.Communication ??= new CommunicationSettings();
+
             TimeMode = settings.Time.Mode;
             SecPerDiv = settings.Time.SecPerDiv;
             SamplePeriod = settings.Time.SamplePeriod;
@@ -882,6 +896,7 @@ namespace MCUScope.ViewModels
             FftScale = settings.Fft.Scale;
 
             AutoSaveEnabled = settings.Save.AutoSave;
+            SelectedPort = settings.Communication.PortName;
 
             for (int i = 0; i < settings.Channels.Count && i < ScopeValues.Count; i++)
             {
@@ -898,6 +913,179 @@ namespace MCUScope.ViewModels
             {
                 LoadVariableFile(settings.VariableFilePath);
             }
+
+            UpdateSerialLocalStatus();
+        }
+
+        private void RebuildVariableNameList()
+        {
+            VariableNames.Clear();
+            var unique = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var variable in _icsService.Variables)
+            {
+                if (unique.Add(variable.DisplayName))
+                {
+                    VariableNames.Add(variable.DisplayName);
+                }
+            }
+        }
+
+        public List<VariableInfo> GetVariableSettingsCopy()
+        {
+            return _icsService.Variables.Select(v => v.Clone()).ToList();
+        }
+
+        public void ApplyVariableSettings(IEnumerable<VariableInfo> editedVariables)
+        {
+            var editedList = editedVariables.ToList();
+            var editedMap = editedList.ToDictionary(
+                v => $"{v.Name}@{v.Address:X8}",
+                v => v,
+                StringComparer.Ordinal);
+
+            var renameMap = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            foreach (var variable in _icsService.Variables)
+            {
+                string key = $"{variable.Name}@{variable.Address:X8}";
+                if (!editedMap.TryGetValue(key, out var edited)) continue;
+
+                string oldDisplay = variable.DisplayName;
+                variable.ModifiedType = edited.ModifiedType;
+                variable.Scale = edited.Scale;
+                variable.ReadEnabled = edited.ReadEnabled;
+                variable.WriteEnabled = edited.WriteEnabled;
+                variable.Alias = edited.Alias;
+                variable.Comment = edited.Comment;
+
+                string newDisplay = variable.DisplayName;
+                if (!string.Equals(oldDisplay, newDisplay, StringComparison.Ordinal))
+                {
+                    renameMap[oldDisplay] = newDisplay;
+                }
+            }
+
+            foreach (var watch in WatchItems)
+            {
+                if (!string.IsNullOrEmpty(watch.Name) && renameMap.TryGetValue(watch.Name, out var renamed))
+                {
+                    watch.Name = renamed;
+                }
+            }
+
+            foreach (var channel in ScopeValues)
+            {
+                if (!string.IsNullOrEmpty(channel.VariableName) &&
+                    renameMap.TryGetValue(channel.VariableName, out var renamed))
+                {
+                    channel.VariableName = renamed;
+                }
+            }
+
+            RebuildVariableNameList();
+        }
+
+        private int ResolveBaudRate()
+        {
+            int baudRate = Settings.Communication.BaudRate > 0
+                ? Settings.Communication.BaudRate
+                : (int)Math.Round(Settings.Communication.BaseClockMHz * 1_000_000 / 8.0);
+
+            if (baudRate <= 0)
+            {
+                baudRate = 1_000_000;
+            }
+
+            return baudRate;
+        }
+
+        private async Task AutoReadLoopAsync(int intervalUs, CancellationToken token)
+        {
+            long intervalTicks = Math.Max(1L,
+                (long)Math.Round(intervalUs * (double)Stopwatch.Frequency / 1_000_000d));
+            var stopwatch = Stopwatch.StartNew();
+            long nextTick = stopwatch.ElapsedTicks;
+
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    if (stopwatch.ElapsedTicks >= nextTick)
+                    {
+                        if (Application.Current != null)
+                        {
+                            await Application.Current.Dispatcher.InvokeAsync(ReadWatchVariables);
+                        }
+
+                        nextTick += intervalTicks;
+                        if (stopwatch.ElapsedTicks > nextTick + intervalTicks * 4)
+                        {
+                            nextTick = stopwatch.ElapsedTicks + intervalTicks;
+                        }
+
+                        continue;
+                    }
+
+                    long remainTicks = nextTick - stopwatch.ElapsedTicks;
+                    double remainMs = remainTicks * 1000.0 / Stopwatch.Frequency;
+
+                    if (remainMs >= 1.0)
+                    {
+                        await Task.Delay(1, token);
+                    }
+                    else
+                    {
+                        Thread.SpinWait(120);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Normal stop path.
+            }
+        }
+
+        private void StartAutoReadLoop()
+        {
+            StopAutoReadLoop();
+
+            AutoReadIntervalUs = Math.Clamp(AutoReadIntervalUs, 1, 10_000_000);
+            _autoReadCts = new CancellationTokenSource();
+            IsAutoReading = true;
+            _autoReadTask = Task.Run(() => AutoReadLoopAsync(AutoReadIntervalUs, _autoReadCts.Token));
+        }
+
+        private void StopAutoReadLoop()
+        {
+            if (_autoReadCts != null)
+            {
+                _autoReadCts.Cancel();
+                _autoReadCts.Dispose();
+                _autoReadCts = null;
+            }
+
+            _autoReadTask = null;
+            IsAutoReading = false;
+        }
+
+        private void UpdateSerialLocalStatus()
+        {
+            string port = _serialService.IsOpen ? _serialService.PortName :
+                (string.IsNullOrWhiteSpace(SelectedPort) ? "-" : SelectedPort);
+            int baudRate = ResolveBaudRate();
+            string localState = _serialService.IsOpen ? "Open" : "Disconnected";
+            string remoteState = ConnectionStatus switch
+            {
+                ConnectionStatus.Connected => "MCU: Connected",
+                ConnectionStatus.IcsUnitOnly => "MCU: Waiting Info",
+                _ => "MCU: Disconnected"
+            };
+            SerialLocalStatusText = $"Port: {port}, Baud: {baudRate}, Local: {localState}, {remoteState}";
+        }
+
+        public void NotifyCommunicationSettingsChanged()
+        {
+            UpdateSerialLocalStatus();
         }
 
         public static string FormatTime(double seconds)
@@ -918,9 +1106,22 @@ namespace MCUScope.ViewModels
             RecordLength = (int)(SecPerDiv * 10 / SamplePeriod) + 1;
         }
 
+        partial void OnSelectedPortChanged(string value)
+        {
+            UpdateSerialLocalStatus();
+        }
+
+        partial void OnAutoReadIntervalUsChanged(int value)
+        {
+            if (value < 1)
+            {
+                AutoReadIntervalUs = 1;
+            }
+        }
+
         public void Dispose()
         {
-            _autoReadTimer?.Dispose();
+            StopAutoReadLoop();
             _icsService.Dispose();
             _serialService.Dispose();
         }

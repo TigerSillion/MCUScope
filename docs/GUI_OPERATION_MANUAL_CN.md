@@ -89,6 +89,7 @@ python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-var 0:0x00
   - `Custom Control Panel`
   - `Timetable Player`
 - `Help`
+  - `使用说明（中文）`：直接打开本手册（`docs/GUI_OPERATION_MANUAL_CN.md`）
   - `About MCUScope`
 
 ### 4.2 工具栏
@@ -109,7 +110,8 @@ python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-var 0:0x00
 - 按钮说明：
   - `Read`：对勾选 R 的变量逐条发起读请求
   - `Write`：对勾选 W 的变量逐条发起写请求
-  - `Auto Read`：按秒周期自动执行 Read
+  - `Auto Read`：按微秒周期自动执行 Read
+  - `us` 输入框：最小支持 `1 us`
 
 ### 4.4 中间图表区
 
@@ -136,7 +138,9 @@ python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-var 0:0x00
 ### 5.1 连接 MCU
 
 1. 打开 `Settings -> Communication Settings`。
-2. 设置 `Baud Rate`（建议 `1000000`）。
+2. 设置 `Baud Rate`：
+   - 可直接输入任意正整数（例如 `1000000`、`1500000`）。
+   - 也可从预置列表快速选择常用波特率。
 3. 选择 COM 口，点击 `Connect`。
 4. 状态栏应显示 `Connected, CPU:RX26T...`。
 
@@ -149,7 +153,11 @@ python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-var 0:0x00
 
 1. 点击 `File -> Load Variables`。
 2. 选择 `.map/.sym/.csv/.xml` 之一。
-3. 加载成功后，可在 Watch/Scope 通道下拉中看到变量名。
+3. 加载成功后，弹窗会显示“已加载变量数量”。
+4. 可在以下窗口看到变量变化：
+   - 左侧 Watch `Name` 下拉框
+   - 中间 Scope Values `Name` 下拉框
+   - `Settings -> Variables Settings` 变量列表（地址/类型/缩放等）
 
 ### 5.3 变量读取
 
@@ -218,7 +226,7 @@ python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-var 0:0x00
 
 - 入口：`Settings -> Variables Settings`
 - 目标：修改类型、缩放、读写权限、别名、注释
-- 当前状态：界面可编辑，但尚未把编辑结果完整回写到协议变量对象（属于未完成项）
+- 当前状态：已实现完整回写。点击 `OK` 后会立即更新 Watch/Scope 使用的变量定义和显示名。
 
 ### 8.2 Array Editor
 
@@ -263,6 +271,13 @@ python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-var 0:0x00
 3. `SamplePeriod/RecordLength` 在 MCU支持范围内。
 4. 检查该通道变量地址/类型是否有效（建议先在 Watch 中可读再上示波）。
 
+### 9.4 加载 MAP 后变量窗口无变化
+
+1. 先看加载成功弹窗中的数量是否大于 0。
+2. 若数量为 0，说明 MAP 格式可能与解析规则不匹配，建议先导出 CSV 再加载。
+3. 若数量大于 0 但下拉框未刷新，先重新打开 `Variables Settings` 窗口。
+4. 确认加载的是当前固件构建输出的最新 `.map`，不是旧版本。
+
 ---
 
 ## 10. 当前不足与后续改善计划
@@ -273,7 +288,6 @@ python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-var 0:0x00
 
 | ID | 问题 | 影响 | 目标验收 |
 |---|---|---|---|
-| P0-1 | `Variable Settings` 未真正回写变量元数据 | 类型/缩放/权限编辑无效 | 编辑后立即影响 Watch 读写与保存项目 |
 | P0-3 | Trigger 参数 MCU 仅存储未参与触发判定 | 触发设置对采样行为无效 | 实现 Auto/Single/Normal 与边沿/阈值判定 |
 | P0-4 | Array Editor 读写未落地 | 无法用于数组在线调参 | 支持连续地址读写与批量 ACK/NACK 反馈 |
 | P0-5 | Custom Control Panel 未接协议 | 自定义控件不可控机 | Slider/Toggle/Display 全部接入读写 API |
@@ -287,7 +301,8 @@ python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-var 0:0x00
 | P1-2 | `TimeMode=Roll` 无独立实现 | 与 Buffer 模式体验一致 | 实现滚动示波显示策略 |
 | P1-3 | FFT Source/Scope 选项过少 | 频谱分析维度受限 | Source 支持按通道筛选；Scope 支持主图/缩放源选择 |
 | P1-4 | 写入结果无明确 ACK/NACK 呈现 | 调参失败定位慢 | 在状态栏/日志显示每次写入结果 |
-| P1-5 | AutoRead 间隔缺少下限保护 | 错误配置可能高频占满串口 | 最小周期限制 + 输入校验提示 |
+| P1-5 | `1 us` 轮询会造成高CPU占用（设计上允许） | 高频轮询可能影响PC实时性 | 增加“速率限制/负载告警”开关并默认启用 |
+| P1-6 | MAP 解析规则仍依赖编译器输出格式 | 部分工程会出现“加载0变量” | 增加 MAP 解析模板和格式诊断提示 |
 
 ### 10.3 P2（工程质量与自动化）
 

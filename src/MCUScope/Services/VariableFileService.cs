@@ -76,28 +76,78 @@ namespace MCUScope.Services
         private static List<VariableInfo> LoadMapFormat(string filePath)
         {
             var variables = new List<VariableInfo>();
-            var content = File.ReadAllText(filePath);
+            var lines = File.ReadAllLines(filePath);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
 
-            // Match patterns like: address name size
-            var pattern = new Regex(@"^[\s]*([0-9a-fA-F]{4,8})[\s]+(_?\w+)[\s]+([0-9a-fA-F]+)",
+            // Renesas map format (symbol on one line + metadata on next line).
+            var symbolNamePattern = new Regex(@"^\s+_([A-Za-z]\w*)\s*$");
+            var symbolMetaPattern = new Regex(@"^\s*([0-9A-Fa-f]{8})\s+([0-9A-Fa-f]+)\s+data\s+,([gl])\s+", RegexOptions.IgnoreCase);
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var symbolMatch = symbolNamePattern.Match(lines[i]);
+                if (!symbolMatch.Success) continue;
+
+                string symbolName = symbolMatch.Groups[1].Value;
+                if (symbolName.StartsWith("__", StringComparison.Ordinal)) continue;
+
+                // Search next few lines for matching metadata entry.
+                for (int j = i + 1; j < Math.Min(i + 6, lines.Length); j++)
+                {
+                    var meta = symbolMetaPattern.Match(lines[j]);
+                    if (!meta.Success) continue;
+
+                    // Keep globals by default. Local/static symbols make the list noisy.
+                    if (!string.Equals(meta.Groups[3].Value, "g", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    uint address = ParseAddress(meta.Groups[1].Value);
+                    if (!int.TryParse(meta.Groups[2].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var size))
+                        continue;
+
+                    if (size <= 0)
+                        continue;
+
+                    string dedupKey = $"{symbolName}@{address:X8}";
+                    if (!seen.Add(dedupKey))
+                        continue;
+
+                    var type = SizeToType(size);
+                    variables.Add(new VariableInfo
+                    {
+                        Name = symbolName,
+                        Address = address,
+                        OriginalType = type,
+                        ModifiedType = type
+                    });
+                    break;
+                }
+            }
+
+            if (variables.Count > 0)
+            {
+                return variables;
+            }
+
+            // Fallback parser for simpler generic map formats.
+            var content = File.ReadAllText(filePath);
+            var genericPattern = new Regex(@"^[\s]*([0-9a-fA-F]{4,8})[\s]+(_?\w+)[\s]+([0-9a-fA-F]+)",
                 RegexOptions.Multiline);
 
-            foreach (Match match in pattern.Matches(content))
+            foreach (Match match in genericPattern.Matches(content))
             {
                 uint address = ParseAddress(match.Groups[1].Value);
                 string name = match.Groups[2].Value;
-                int size = int.Parse(match.Groups[3].Value, NumberStyles.HexNumber);
+                if (name.StartsWith("__", StringComparison.Ordinal)) continue;
+                if (!int.TryParse(match.Groups[3].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var size)) continue;
+                if (size <= 0) continue;
 
-                // Skip compiler-generated symbols
-                if (name.StartsWith("__")) continue;
-
-                var type = SizeToType(size);
                 variables.Add(new VariableInfo
                 {
                     Name = name.TrimStart('_'),
                     Address = address,
-                    OriginalType = type,
-                    ModifiedType = type
+                    OriginalType = SizeToType(size),
+                    ModifiedType = SizeToType(size)
                 });
             }
 

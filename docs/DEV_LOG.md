@@ -1,6 +1,23 @@
 # DEV_LOG.md
 
 ## 2026-02-16
+Summary: Fixed GUI variable loading/visibility issues and completed requested UX upgrades (serial local status, arbitrary baud, Chinese help menu, microsecond auto-read).
+Files: src/MCUScope/Services/VariableFileService.cs, src/MCUScope/ViewModels/MainViewModel.cs, src/MCUScope/Views/MainWindow.xaml, src/MCUScope/Views/MainWindow.xaml.cs, src/MCUScope/Dialogs/CommunicationSettingsDialog.xaml, src/MCUScope/Dialogs/CommunicationSettingsDialog.xaml.cs, src/MCUScope/Dialogs/VariableSettingsDialog.xaml.cs, docs/GUI_OPERATION_MANUAL_CN.md, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- `VariableFileService.LoadMapFormat` now parses Renesas linker symbol-list map format (`symbol line + data metadata line`) and falls back to generic map parsing if needed, improving `.map` variable discovery.
+- `VariableSettingsDialog` now loads editable copies from real runtime variables and applies edits back through `MainViewModel.ApplyVariableSettings` (including alias/type/scale/RW/comment).
+- `MainWindow` status bar now shows serial local state (`Port/Baud/Local/MCU`) via `SerialLocalStatusText`, refreshed on port/connection/setting changes.
+- Communication settings dialog now provides editable arbitrary baud-rate input plus common presets and writes changes back with immediate local-status refresh.
+- Help menu added `使用说明（中文）`, with click handler that opens `docs/GUI_OPERATION_MANUAL_CN.md` directly.
+- Auto-read interval now uses microseconds (`AutoReadIntervalUs`) with minimum clamp `1 us`.
+- Watch/Scope Name columns switched to template `ComboBox` bindings against `VariableNames`, improving variable-list refresh consistency after load/update.
+- Updated Chinese GUI manual with the above behavior and a revised improvement plan.
+Tests:
+- `dotnet build MCUScope.sln` executed; passed with `0 warning` and `0 error`.
+- `dotnet run --project src/MCUScope/MCUScope.csproj` executed via background process; GUI process started successfully and remained running until terminated by test script.
+- PowerShell regex check executed on `Reference/.../HardwareDebug/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.map`; Renesas symbol pattern matched 99 global data symbols.
+
+## 2026-02-16
 Summary: Fixed WPF GUI runtime startup failure and verified the desktop app launches successfully.
 Files: src/MCUScope/Views/MainWindow.xaml, docs/CHANGELOG.md, docs/DEV_LOG.md.
 Behavior:

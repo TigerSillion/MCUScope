@@ -1,8 +1,8 @@
 using MCUScope.Models;
 using MCUScope.ViewModels;
 using System.Collections.Generic;
-using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 
 namespace MCUScope.Dialogs
 {
@@ -15,30 +15,17 @@ namespace MCUScope.Dialogs
         {
             InitializeComponent();
             _vm = vm;
-            // Create editable copies
-            _editCopy = vm.VariableNames
-                .Select(name =>
-                {
-                    var orig = _vm.GetType().GetProperty("_icsService") != null ? null :
-                        new VariableInfo { Name = name };
-                    return orig ?? new VariableInfo { Name = name };
-                })
-                .ToList();
-
-            // Use the actual variables from the protocol service
-            _editCopy.Clear();
-            // Access through reflection-free approach: just create from variable names
-            foreach (var name in vm.VariableNames)
-            {
-                _editCopy.Add(new VariableInfo { Name = name, ModifiedType = VariableType.Int32 });
-            }
+            _editCopy = vm.GetVariableSettingsCopy();
 
             VariableGrid.ItemsSource = _editCopy;
         }
 
         private void OnOk(object sender, RoutedEventArgs e)
         {
-            // Apply changes back
+            // Commit current in-place edit before applying back to ViewModel.
+            VariableGrid.CommitEdit(DataGridEditingUnit.Cell, true);
+            VariableGrid.CommitEdit(DataGridEditingUnit.Row, true);
+            _vm.ApplyVariableSettings(_editCopy);
             DialogResult = true;
             Close();
         }

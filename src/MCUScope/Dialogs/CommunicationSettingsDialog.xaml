@@ -18,8 +18,8 @@
         </Grid.ColumnDefinitions>
 
         <TextBlock Grid.Row="0" Grid.Column="0" Text="Baud Rate (bps):" VerticalAlignment="Center" Margin="0,4"/>
-        <TextBox Grid.Row="0" Grid.Column="1" x:Name="BaudRateTextBox" Margin="8,4" Width="140"
-                 HorizontalAlignment="Left" VerticalContentAlignment="Center"/>
+        <ComboBox Grid.Row="0" Grid.Column="1" x:Name="BaudRateComboBox" Margin="8,4" Width="160"
+                  HorizontalAlignment="Left" IsEditable="True" IsTextSearchEnabled="False"/>
 
         <TextBlock Grid.Row="1" Grid.Column="0" Text="ICS Base Clock (MHz):" VerticalAlignment="Center" Margin="0,4"/>
         <TextBox Grid.Row="1" Grid.Column="1" x:Name="ClockTextBox" Margin="8,4" Width="100"

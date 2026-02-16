@@ -1,5 +1,8 @@
-using MCUScope.Dialogs;
+﻿using MCUScope.Dialogs;
 using MCUScope.ViewModels;
+using System;
+using System.Diagnostics;
+using System.IO;
 using System.Windows;
 
 namespace MCUScope.Views
@@ -77,6 +80,46 @@ namespace MCUScope.Views
                 "About MCUScope",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
+        }
+
+        private void OnChineseManual(object sender, RoutedEventArgs e)
+        {
+            string[] candidatePaths =
+            {
+                Path.Combine(AppContext.BaseDirectory, "docs", "GUI_OPERATION_MANUAL_CN.md"),
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "docs", "GUI_OPERATION_MANUAL_CN.md"))
+            };
+
+            string manualPath = string.Empty;
+            foreach (var path in candidatePaths)
+            {
+                if (File.Exists(path))
+                {
+                    manualPath = path;
+                    break;
+                }
+            }
+
+            if (string.IsNullOrEmpty(manualPath))
+            {
+                MessageBox.Show("Manual file not found: docs/GUI_OPERATION_MANUAL_CN.md",
+                    "Manual Missing", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = manualPath,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to open manual: {ex.Message}",
+                    "Open Manual Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
     }
 }
