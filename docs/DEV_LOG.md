@@ -1,6 +1,20 @@
 # DEV_LOG.md
 
 ## 2026-02-16
+Summary: Added a complete Chinese GUI operation manual aligned to current MCU UART implementation and documented a prioritized GUI improvement backlog.
+Files: docs/GUI_OPERATION_MANUAL_CN.md, docs/USAGE.md, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- Added `docs/GUI_OPERATION_MANUAL_CN.md` with chapter-style structure similar to ICS manuals, covering:
+  - system architecture and communication prerequisites,
+  - GUI menu/panel operation details,
+  - end-to-end read/write/scope workflows,
+  - exact MCU variable whitelist (29 entries) and fixed scope channel mapping (M1..M12) derived from `ICS2_RX26T.c`.
+- Added an explicit “current gaps and improvement plan” section with P0/P1/P2 priorities and acceptance targets for unfinished GUI features (Variable Settings, Array Editor, Custom Control Panel, Timetable Player, trigger/cursor/roll/FFT enhancements, logging/tests).
+- Updated `docs/USAGE.md` overview to link the new Chinese GUI manual.
+Tests:
+- `dotnet build MCUScope.sln` executed; passed with `0 warning` and `0 error`.
+
+## 2026-02-16
 Summary: Fixed RX MCU linker failure caused by unsupported inline assembly token in UART init delay loop.
 Files: Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/src/application/user_interface/ics/ICS2_RX26T.c, docs/CHANGELOG.md, docs/DEV_LOG.md.
 Behavior:

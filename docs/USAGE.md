@@ -5,6 +5,8 @@
 This project contains:
 - A PC GUI (`src/MCUScope`) that talks to MCU over UART.
 - A reference RX26T firmware project under `Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100`.
+- A Chinese GUI operation manual:
+`docs/GUI_OPERATION_MANUAL_CN.md`.
 - A detailed MCU algorithm + variable + troubleshooting guide:
 `docs/MCU_CODE_AND_MOTOR_DEBUG_GUIDE.md`.
 
