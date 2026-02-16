@@ -1,6 +1,16 @@
 # DEV_LOG.md
 
 ## 2026-02-16
+Summary: Fixed RX MCU linker failure caused by unsupported inline assembly token in UART init delay loop.
+Files: Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/src/application/user_interface/ics/ICS2_RX26T.c, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- Replaced `__asm("nop")` in `serial_init_sci6()` delay loop with a pure volatile loop body.
+- Prevents generation of unresolved external symbol `___asm` in `ICS2_RX26T.obj` on toolchains where `__asm` is not treated as inline assembly keyword.
+- Delay intent is preserved because loop counter is `volatile`.
+Tests:
+- `rg --line-number "__asm\\(" Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/src/application` executed; no remaining inline `__asm` in application sources.
+
+## 2026-02-16
 Summary: Added dedicated MCU algorithm/debug documentation and implemented obsolete closed-lib cleanup tool.
 Files: tools/cleanup_legacy_libs.py, docs/MCU_CODE_AND_MOTOR_DEBUG_GUIDE.md, docs/USAGE.md, docs/TESTING.md, docs/CHANGELOG.md, docs/DEV_LOG.md.
 Behavior:

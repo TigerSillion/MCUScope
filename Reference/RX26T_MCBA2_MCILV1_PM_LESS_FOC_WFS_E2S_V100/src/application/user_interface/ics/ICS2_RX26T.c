@@ -314,7 +314,7 @@ static void serial_init_sci6(uint8_t level, uint8_t speed)
 
     for (wait_count = 0U; wait_count < 4000U; wait_count++)
     {
-        __asm("nop");
+        /* Delay loop after BRR update to satisfy SCI timing requirements. */
     }
 
     IPR(SCI6, RXI6) = level;

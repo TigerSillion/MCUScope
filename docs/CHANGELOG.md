@@ -1,6 +1,7 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Fixed RX build linker issue `Undefined external symbol "___asm"` by removing unsupported inline `__asm("nop")` usage in `ICS2_RX26T.c`.
 - Added `docs/MCU_CODE_AND_MOTOR_DEBUG_GUIDE.md` as a dedicated MCU source explanation, variable usage reference, and motor no-rotation debug workflow.
 - Added `tools/cleanup_legacy_libs.py` to detect/remove obsolete closed `.lib` artifacts now replaced by C source files.
 - Removed stale unused `MainViewModel` fields (`_autoSaveTimer`, `_isRunning`) to clear build warnings.
