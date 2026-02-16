@@ -36,12 +36,16 @@
               <Path>src\application\motor_module\current\r_motor_current_api.c</Path>
               <Path>src\application\motor_module\current\r_motor_current_api.h</Path>
               <Path>src\application\motor_module\current\r_motor_current_bemf_observer.h</Path>
+              <Path>src\application\motor_module\current\r_motor_current_bemf_observer.c</Path>
               <Path>src\application\motor_module\current\r_motor_current_modulation.c</Path>
               <Path>src\application\motor_module\current\r_motor_current_modulation.h</Path>
               <Path>src\application\motor_module\current\r_motor_current_pi_gain_calc.c</Path>
               <Path>src\application\motor_module\current\r_motor_current_stall_detection.h</Path>
+              <Path>src\application\motor_module\current\r_motor_current_stall_detection.c</Path>
               <Path>src\application\motor_module\current\r_motor_current_trq_vib_comp.h</Path>
+              <Path>src\application\motor_module\current\r_motor_current_trq_vib_comp.c</Path>
               <Path>src\application\motor_module\current\r_motor_current_volt_err_comp.h</Path>
+              <Path>src\application\motor_module\current\r_motor_current_volt_err_comp.c</Path>
             </Category>
             <Category Name="driver">
               <Path>src\application\motor_module\driver\r_motor_driver.c</Path>
@@ -59,6 +63,7 @@
               <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_api.c</Path>
               <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_api.h</Path>
               <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_flyingstart.h</Path>
+              <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_flyingstart.c</Path>
               <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_manager.c</Path>
               <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_manager.h</Path>
               <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_protection.c</Path>
@@ -72,10 +77,13 @@
               <Path>src\application\motor_module\speed\r_motor_speed_api.c</Path>
               <Path>src\application\motor_module\speed\r_motor_speed_api.h</Path>
               <Path>src\application\motor_module\speed\r_motor_speed_fluxwkn.h</Path>
+              <Path>src\application\motor_module\speed\r_motor_speed_fluxwkn.c</Path>
               <Path>src\application\motor_module\speed\r_motor_speed_mtpa.c</Path>
               <Path>src\application\motor_module\speed\r_motor_speed_mtpa.h</Path>
               <Path>src\application\motor_module\speed\r_motor_speed_opl2less.h</Path>
+              <Path>src\application\motor_module\speed\r_motor_speed_opl2less.c</Path>
               <Path>src\application\motor_module\speed\r_motor_speed_opl_damp_ctrl.h</Path>
+              <Path>src\application\motor_module\speed\r_motor_speed_opl_damp_ctrl.c</Path>
               <Path>src\application\motor_module\speed\r_motor_speed_pi_gain_calc.c</Path>
             </Category>
           </Category>
@@ -487,14 +495,6 @@
           <Option>-rom=D=R,D_1=R_1,D_2=R_2</Option>
           <Option>-cpu=RAM=00000000-0000ffff,FIX=00080000-00083fff,FIX=00086000-00087fff,FIX=00088000-0009ffff,FIX=000a0000-000a3fff,FIX=000a6000-000bffff,FIX=000c0000-000dffff,FIX=000e0000-000fffff,ROM=00100000-00103fff,RAM=00120040-001200af,FIX=007fb174-007fb177,FIX=007fb17c-007fb17f,FIX=007fb1e4-007fb1eb,FIX=007fe000-007fffff,ROM=fff80000-ffffffff</Option>
           <Option>-nologo</Option>
-          <Option>-library="${ProjDirPath}\src\application\motor_module\current\r_motor_current_bemf_observer.lib"</Option>
-          <Option>-library="${ProjDirPath}\src\application\motor_module\current\r_motor_current_stall_detection.lib"</Option>
-          <Option>-library="${ProjDirPath}\src\application\motor_module\current\r_motor_current_trq_vib_comp.lib"</Option>
-          <Option>-library="${ProjDirPath}\src\application\motor_module\current\r_motor_current_volt_err_comp.lib"</Option>
-          <Option>-library="${ProjDirPath}\src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_flyingstart.lib"</Option>
-          <Option>-library="${ProjDirPath}\src\application\motor_module\speed\r_motor_speed_fluxwkn.lib"</Option>
-          <Option>-library="${ProjDirPath}\src\application\motor_module\speed\r_motor_speed_opl_damp_ctrl.lib"</Option>
-          <Option>-library="${ProjDirPath}\src\application\motor_module\speed\r_motor_speed_opl2less.lib"</Option>
           <Option>-start=BDTCTBL/0,SU,SI,B_1,R_1,B_2,R_2,B,R/0400,PResetPRG,C_1,C_2,C,C$*,D*,W*,L,P/0FFF80000,EXCEPTVECT/0FFFFFF80,RESETVECT/0FFFFFFFC</Option>
           <Option>-end</Option>
           <Option>-output="${ProjName}.mot"</Option>
@@ -583,14 +583,6 @@
           <Path>HardwareDebug\Config_S12AD0_user.obj</Path>
           <Path>HardwareDebug\Config_S12AD2.obj</Path>
           <Path>HardwareDebug\Config_S12AD2_user.obj</Path>
-          <Path>${ProjDirPath}\src\application\motor_module\current\r_motor_current_bemf_observer.lib</Path>
-          <Path>${ProjDirPath}\src\application\motor_module\current\r_motor_current_stall_detection.lib</Path>
-          <Path>${ProjDirPath}\src\application\motor_module\current\r_motor_current_trq_vib_comp.lib</Path>
-          <Path>${ProjDirPath}\src\application\motor_module\current\r_motor_current_volt_err_comp.lib</Path>
-          <Path>${ProjDirPath}\src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_flyingstart.lib</Path>
-          <Path>${ProjDirPath}\src\application\motor_module\speed\r_motor_speed_fluxwkn.lib</Path>
-          <Path>${ProjDirPath}\src\application\motor_module\speed\r_motor_speed_opl_damp_ctrl.lib</Path>
-          <Path>${ProjDirPath}\src\application\motor_module\speed\r_motor_speed_opl2less.lib</Path>
         </LinkOrder>
         <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_CMT0\Config_CMT0.c"/>
         <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_CMT0\Config_CMT0_user.c"/>

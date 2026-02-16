@@ -1,6 +1,8 @@
 #ifndef ICS2_RX26T_H
 #define ICS2_RX26T_H
 
+#include <stdint.h>
+
 
 #define   ICS_SCI1_PD3_PD5    (0x10U)  //
 #define   ICS_SCI5_PD7_PE0    (0x50U)  //

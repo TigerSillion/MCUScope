@@ -7,6 +7,10 @@
 - Variable read/write correctness
 - Scope start/stop and waveform packet stream
 - UART stability at target baud rate
+- BEMF observer and PLL update path (no linker dependency on closed lib)
+- Flux weakening / OPL damping / OPL2LESS switching helper path
+- Flying-start state-action sequence
+- Torque vibration compensation function path (LUT and PAT entry points)
 
 ## PC-side Checks
 
@@ -24,6 +28,8 @@
 3. Confirm TX interrupt drains queued packets.
 4. Confirm malformed packets are ignored (bad checksum).
 5. Confirm unsupported variable address returns NACK.
+6. Confirm project links without `*.lib` motor helper dependencies listed in `docs/USAGE.md`.
+7. Confirm all replacement C files are compiled into target (map file symbol check).
 
 ## Recommended Bench Procedure
 
@@ -48,3 +54,4 @@ After any protocol or variable map change:
 
 - No automated unit test harness exists yet for MCU protocol parser.
 - Hardware-in-loop validation is required for timing and throughput confirmation.
+- Control-loop dynamic behavior must be tuned and verified on real motor/inverter hardware.

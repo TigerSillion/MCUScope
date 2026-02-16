@@ -137,15 +137,8 @@ all: RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.x RX26T_MCBA2_MCILV1_PM_LESS_FO
 	rlink -subcommand="ConverterRX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.tmp"
 
 
-RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.abs: $(LIBRARY_GENERATOR_OUTPUTTYPE_OUTPUTS) $(OBJS) $(ALL_ASMS)  \
-C:\workspace5\flying-start-for-mck\RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100\src\application\motor_module\current\r_motor_current_bemf_observer.lib  \
-C:\workspace5\flying-start-for-mck\RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100\src\application\motor_module\current\r_motor_current_stall_detection.lib  \
-C:\workspace5\flying-start-for-mck\RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100\src\application\motor_module\current\r_motor_current_trq_vib_comp.lib  \
-C:\workspace5\flying-start-for-mck\RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100\src\application\motor_module\current\r_motor_current_volt_err_comp.lib  \
-C:\workspace5\flying-start-for-mck\RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100\src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_flyingstart.lib  \
-C:\workspace5\flying-start-for-mck\RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100\src\application\motor_module\speed\r_motor_speed_fluxwkn.lib  \
-C:\workspace5\flying-start-for-mck\RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100\src\application\motor_module\speed\r_motor_speed_opl_damp_ctrl.lib  \
-C:\workspace5\flying-start-for-mck\RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100\src\application\motor_module\speed\r_motor_speed_opl2less.lib
+RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.abs: $(LIBRARY_GENERATOR_OUTPUTTYPE_OUTPUTS) $(OBJS) $(ALL_ASMS)
+
 	@echo 'Invoking Linker: $@'
 	@echo LinkerRX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.tmp=
 	@sed -e "s/^/    /" "LinkerRX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.tmp"

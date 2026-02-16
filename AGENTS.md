@@ -4,6 +4,7 @@ This file defines agent execution rules for this repository.
 
 Scope
 - Follow user instructions in the current session and the rules in docs/AI_RULES.md.
+- Follow docs/AGENT_MCP_SKILLS.md for Agent/MCP/Skills coordination defaults.
 - Keep all new text ASCII unless the target file already uses non-ASCII.
 
 MCP and skills

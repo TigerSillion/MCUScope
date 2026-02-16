@@ -4,6 +4,7 @@ Core policy
 - Prefer action over questions. Only ask when blocked by missing facts that cannot be inferred safely.
 - Keep behavior deterministic and document all assumptions.
 - Treat docs/UART_PROTOCOL.md as the protocol source of truth.
+- Treat docs/AGENT_MCP_SKILLS.md as the shared baseline for Agent/MCP/Skills coordination rules.
 
 Code quality
 - Add clear comments for non-obvious logic and protocol handling.

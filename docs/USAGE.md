@@ -53,6 +53,18 @@ Current default UART config in firmware:
 
 ## Known Limits (Current Stage)
 
-- This round replaces the ICS communication library only.
-- Other closed motor control libraries are still linked and are tracked as follow-up work.
 - Scope channel data source is fixed to 12 predefined runtime signals in `ICS2_RX26T.c`.
+- The open C replacements focus on deterministic and maintainable behavior first; control tuning may need retuning on real hardware.
+
+## Closed Lib Replacement Status
+
+The following former closed libraries are now replaced by C source files in the firmware project:
+- `ICS2_RX26T.lib` -> `src/application/user_interface/ics/ICS2_RX26T.c`
+- `r_motor_current_bemf_observer.lib` -> `src/application/motor_module/current/r_motor_current_bemf_observer.c`
+- `r_motor_current_stall_detection.lib` -> `src/application/motor_module/current/r_motor_current_stall_detection.c`
+- `r_motor_current_trq_vib_comp.lib` -> `src/application/motor_module/current/r_motor_current_trq_vib_comp.c`
+- `r_motor_current_volt_err_comp.lib` -> `src/application/motor_module/current/r_motor_current_volt_err_comp.c`
+- `r_motor_sensorless_vector_flyingstart.lib` -> `src/application/motor_module/sensorless_vector/r_motor_sensorless_vector_flyingstart.c`
+- `r_motor_speed_fluxwkn.lib` -> `src/application/motor_module/speed/r_motor_speed_fluxwkn.c`
+- `r_motor_speed_opl_damp_ctrl.lib` -> `src/application/motor_module/speed/r_motor_speed_opl_damp_ctrl.c`
+- `r_motor_speed_opl2less.lib` -> `src/application/motor_module/speed/r_motor_speed_opl2less.c`
