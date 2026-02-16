@@ -11,6 +11,9 @@ Usage examples:
 from __future__ import annotations
 
 import argparse
+import contextlib
+from datetime import datetime
+from pathlib import Path
 import struct
 import sys
 import time
@@ -73,6 +76,21 @@ class WriteVarSpec:
     address: int
     var_type: int
     value: float
+
+
+class TeeStream:
+    """Mirror stdout/stderr to both console and an optional log file."""
+
+    def __init__(self, *streams) -> None:
+        self.streams = streams
+
+    def write(self, data: str) -> None:
+        for stream in self.streams:
+            stream.write(data)
+
+    def flush(self) -> None:
+        for stream in self.streams:
+            stream.flush()
 
 
 def checksum(body: bytes) -> int:
@@ -421,6 +439,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true", help="Build packets only, no serial communication.")
     parser.add_argument("--verbose", action="store_true", help="Print raw TX/RX protocol traffic.")
     parser.add_argument(
+        "--log-file",
+        default=None,
+        help="Optional log file path. When set, output is mirrored to this file.",
+    )
+    parser.add_argument(
         "--read-var",
         dest="read_var_tokens",
         action="append",
@@ -478,9 +501,7 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def main() -> int:
-    args = parse_args()
-
+def execute_args(args: argparse.Namespace) -> int:
     if args.dry_run:
         return run_dry_run(
             read_specs=args.read_vars,
@@ -499,6 +520,33 @@ def main() -> int:
     except KeyboardInterrupt:
         print("Smoke test aborted by user.")
         return 130
+
+
+def run_with_log(args: argparse.Namespace) -> int:
+    if not args.log_file:
+        return execute_args(args)
+
+    log_path = Path(args.log_file)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with log_path.open("w", encoding="utf-8") as log_stream:
+        header = (
+            f"UART smoke log\n"
+            f"timestamp={datetime.now().isoformat(timespec='seconds')}\n"
+            f"argv={' '.join(sys.argv)}\n\n"
+        )
+        log_stream.write(header)
+        log_stream.flush()
+
+        tee = TeeStream(sys.stdout, log_stream)
+        with contextlib.redirect_stdout(tee), contextlib.redirect_stderr(tee):
+            print(f"[INFO] Logging enabled: {log_path}")
+            return execute_args(args)
+
+
+def main() -> int:
+    args = parse_args()
+    return run_with_log(args)
 
 
 if __name__ == "__main__":

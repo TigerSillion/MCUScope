@@ -33,6 +33,15 @@ Run from repository root:
 5. UART variable read/write smoke on hardware:
 `python tools/uart_smoke.py --port COM5 --read-var com_u1_system_mode:0x00001829 --write-var com_u1_system_mode:0x00001829:u8:1`
 
+6. One-click batch regression (artifacts + UART smoke + dotnet build):
+`python tools/run_regression.py`
+
+7. Enable stale-map hard fail in batch mode:
+`python tools/run_regression.py --fail-on-stale-map --map Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/HardwareDebug/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.map`
+
+8. Persist UART smoke output in custom file:
+`python tools/uart_smoke.py --dry-run --scope --scope-channels 0,1 --log-file logs/uart_smoke_latest.log`
+
 ## PC-side Checks
 
 1. Open GUI and connect to target COM port.

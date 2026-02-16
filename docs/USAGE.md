@@ -75,9 +75,16 @@ Use these scripts from repository root to speed up regression checks.
 5. Optional variable read/write in smoke test:
 `python tools/uart_smoke.py --port COM5 --read-var com_u1_system_mode:0x00001829 --write-var com_u1_system_mode:0x00001829:u8:1`
 
+6. Run one-click regression with automatic log:
+`python tools/run_regression.py`
+
+7. Save UART smoke output into a file:
+`python tools/uart_smoke.py --dry-run --scope --scope-channels 0,1 --log-file logs/uart_smoke_latest.log`
+
 Notes:
 - `tools/uart_smoke.py` requires `pyserial` for live mode (`pip install pyserial`).
 - `--map` validation is strict and should be run with a freshly generated `.map` file.
+- `tools/run_regression.py` writes a timestamped log under `logs/` by default.
 
 ## Closed Lib Replacement Status
 

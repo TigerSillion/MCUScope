@@ -5,11 +5,13 @@ This script checks:
 1) Project configuration files do not reference deprecated closed libraries.
 2) Replacement C source files exist and are listed in the project file.
 3) (Optional) Linker map also excludes closed libs and includes replacement objects.
+4) (Optional) Map freshness against project/source modification timestamps.
 """
 
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 from pathlib import Path
 import sys
 from typing import Iterable, List
@@ -62,6 +64,10 @@ def _find_tokens(text: str, tokens: Iterable[str]) -> List[str]:
 def _print_result(ok: bool, message: str) -> None:
     tag = "PASS" if ok else "FAIL"
     print(f"[{tag}] {message}")
+
+
+def _print_warning(message: str) -> None:
+    print(f"[WARN] {message}")
 
 
 def _check_file_exists(path: Path, failures: List[str], description: str) -> bool:
@@ -121,11 +127,65 @@ def _validate_source_files(firmware_root: Path, failures: List[str]) -> None:
         _print_result(True, "Replacement source file existence check")
 
 
-def _validate_map_file(map_path: Path, failures: List[str]) -> None:
+def _fmt_ts(path: Path) -> str:
+    return datetime.fromtimestamp(path.stat().st_mtime).isoformat(timespec="seconds")
+
+
+def _validate_map_freshness(
+    firmware_root: Path,
+    map_path: Path,
+    failures: List[str],
+    warnings: List[str],
+    fail_on_stale_map: bool,
+) -> None:
+    dependency_paths = [
+        firmware_root / f"{PROJECT_NAME}.rcpc",
+        firmware_root / "HardwareDebug" / "makefile",
+    ] + [firmware_root / Path(src) for src in REPLACEMENT_SOURCES]
+
+    existing_deps = [path for path in dependency_paths if path.exists()]
+    if not existing_deps:
+        return
+
+    newest_dep = max(existing_deps, key=lambda item: item.stat().st_mtime)
+    newest_dep_ts = newest_dep.stat().st_mtime
+    map_ts = map_path.stat().st_mtime
+
+    if map_ts >= newest_dep_ts:
+        _print_result(True, "Map freshness check")
+        return
+
+    message = (
+        "Map file is older than firmware project/source changes. "
+        f"map={_fmt_ts(map_path)} newest_dep={newest_dep}({_fmt_ts(newest_dep)})"
+    )
+    if fail_on_stale_map:
+        failures.append(message)
+        _print_result(False, "Map freshness check")
+    else:
+        warnings.append(message)
+        _print_warning(message)
+
+
+def _validate_map_file(
+    firmware_root: Path,
+    map_path: Path,
+    failures: List[str],
+    warnings: List[str],
+    fail_on_stale_map: bool,
+) -> None:
     if not map_path.exists():
         failures.append(f"Map file not found: {map_path}")
         _print_result(False, f"Map file exists: {map_path}")
         return
+
+    _validate_map_freshness(
+        firmware_root=firmware_root,
+        map_path=map_path,
+        failures=failures,
+        warnings=warnings,
+        fail_on_stale_map=fail_on_stale_map,
+    )
 
     map_text = _read_text(map_path)
 
@@ -170,6 +230,14 @@ def parse_args() -> argparse.Namespace:
             "If provided, script also validates map references and linked objects."
         ),
     )
+    parser.add_argument(
+        "--fail-on-stale-map",
+        action="store_true",
+        help=(
+            "Fail when map timestamp is older than project/motor replacement sources. "
+            "Default behavior is warning only."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -177,6 +245,7 @@ def main() -> int:
     args = parse_args()
     firmware_root = Path(args.firmware_root)
     failures: List[str] = []
+    warnings: List[str] = []
 
     print("== MCU Artifact Validation ==")
     _check_file_exists(firmware_root, failures, "Firmware root")
@@ -185,9 +254,20 @@ def main() -> int:
     _validate_source_files(firmware_root, failures)
 
     if args.map:
-        _validate_map_file(Path(args.map), failures)
+        _validate_map_file(
+            firmware_root=firmware_root,
+            map_path=Path(args.map),
+            failures=failures,
+            warnings=warnings,
+            fail_on_stale_map=args.fail_on_stale_map,
+        )
     else:
         print("[INFO] Map validation skipped (use --map <path> to enable).")
+
+    if warnings:
+        print("\nWarnings:")
+        for item in warnings:
+            print(f" - {item}")
 
     if failures:
         print("\nSummary: FAILED")

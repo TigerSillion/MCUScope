@@ -24,8 +24,6 @@ namespace MCUScope.ViewModels
         private readonly SerialCommunicationService _serialService;
         private readonly IcsProtocolService _icsService;
         private Timer? _autoReadTimer;
-        private Timer? _autoSaveTimer;
-        private bool _isRunning;
         private string _currentProjectPath = string.Empty;
 
         // Scope state
@@ -885,7 +883,6 @@ namespace MCUScope.ViewModels
         public void Dispose()
         {
             _autoReadTimer?.Dispose();
-            _autoSaveTimer?.Dispose();
             _icsService.Dispose();
             _serialService.Dispose();
         }

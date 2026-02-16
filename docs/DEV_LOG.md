@@ -1,6 +1,32 @@
 # DEV_LOG.md
 
 ## 2026-02-16
+Summary: Cleaned up stale ViewModel fields to eliminate remaining WPF build warnings.
+Files: src/MCUScope/ViewModels/MainViewModel.cs, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- Removed unused fields `_autoSaveTimer` and `_isRunning` from `MainViewModel`.
+- Removed the now-unneeded `_autoSaveTimer` disposal call.
+- Build output is now warning-free for current solution state.
+Tests:
+- `dotnet build MCUScope.sln` executed; passed with `0 warning` and `0 error`.
+
+## 2026-02-16
+Summary: Extended automation to one-click regression runs with persistent logs and map freshness guard.
+Files: tools/check_mcu_artifacts.py, tools/uart_smoke.py, tools/run_regression.py, docs/USAGE.md, docs/TESTING.md, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- `tools/check_mcu_artifacts.py` now checks map freshness against RCPC/makefile/replacement source timestamps when `--map` is provided.
+- Added `--fail-on-stale-map` option to enforce strict stale-map failure for CI-like gating.
+- `tools/uart_smoke.py` now supports `--log-file` and mirrors full stdout/stderr to a trace file for protocol debug traceability.
+- Added `tools/run_regression.py` to execute artifact checks + UART smoke (dry-run or live serial) + optional `dotnet build` in one command with timestamped logs.
+- Updated usage/testing docs with concrete batch commands and log-related examples.
+Tests:
+- `python -m py_compile tools/check_mcu_artifacts.py tools/uart_smoke.py tools/run_regression.py` executed; passed.
+- `python tools/check_mcu_artifacts.py` executed; passed.
+- `python tools/check_mcu_artifacts.py --map Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/HardwareDebug/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.map` executed; failed as expected because the stale map still references removed `.lib` files and does not include replacement object files.
+- `python tools/uart_smoke.py --dry-run --scope --scope-channels 0,1 --log-file logs/uart_smoke_dryrun.log` executed; passed.
+- `python tools/run_regression.py --skip-dotnet-build --no-map` executed; passed.
+
+## 2026-02-16
 Summary: Added automation tooling for MCU dependency regression checks and UART protocol smoke testing.
 Files: tools/check_mcu_artifacts.py, tools/uart_smoke.py, docs/USAGE.md, docs/TESTING.md, docs/CHANGELOG.md, docs/DEV_LOG.md.
 Behavior:

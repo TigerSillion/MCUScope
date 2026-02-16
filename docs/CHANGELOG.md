@@ -1,6 +1,10 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Removed stale unused `MainViewModel` fields (`_autoSaveTimer`, `_isRunning`) to clear build warnings.
+- Added `tools/run_regression.py` batch runner to execute artifact checks, UART smoke, and `dotnet build` with timestamped logs.
+- Enhanced `tools/check_mcu_artifacts.py` with map freshness detection (warn by default, optional fail mode).
+- Enhanced `tools/uart_smoke.py` with `--log-file` output mirroring for traceable smoke runs.
 - Added `tools/check_mcu_artifacts.py` to verify replacement C sources are present and closed MCU libs are no longer referenced by project config (optional map-file strict validation included).
 - Added `tools/uart_smoke.py` for UART protocol smoke testing with dry-run packet generation plus live GetInfo/read/write/scope checks.
 - Fixed GUI build blockers by adding the missing `ToggleButton` namespace import and removing a missing icon reference from `MCUScope.csproj`.
