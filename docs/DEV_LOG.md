@@ -1,6 +1,16 @@
 # DEV_LOG.md
 
 ## 2026-02-16
+Summary: Fixed WPF GUI runtime startup failure and verified the desktop app launches successfully.
+Files: src/MCUScope/Views/MainWindow.xaml, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- Removed invalid `Height=\"*\"` from `TabControl` in `MainWindow.xaml` (WPF `Height` expects a numeric length, not star sizing).
+- Eliminated startup `XamlParseException` at `MainWindow.xaml` line 114 during `dotnet run`.
+Tests:
+- `dotnet run --project src/MCUScope/MCUScope.csproj` executed; no startup parse exception.
+- GUI process confirmed running: `MCUScope.exe` started via background run.
+
+## 2026-02-16
 Summary: Implemented unrestricted (address-based) global variable read/write and dynamic scope variable binding from GUI to MCU.
 Files: Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/src/application/user_interface/ics/ICS2_RX26T.c, src/MCUScope/Services/IcsProtocolService.cs, src/MCUScope/ViewModels/MainViewModel.cs, tools/uart_smoke.py, tools/run_regression.py, docs/UART_PROTOCOL.md, docs/USAGE.md, docs/TESTING.md, docs/GUI_OPERATION_MANUAL_CN.md, docs/MCU_CODE_AND_MOTOR_DEBUG_GUIDE.md, docs/CHANGELOG.md, docs/DEV_LOG.md.
 Behavior:

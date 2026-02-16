@@ -1,6 +1,7 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Fixed GUI startup crash caused by invalid WPF `Height="*"` on `TabControl` in `MainWindow.xaml` (XAML parse error at runtime).
 - Added free global-variable address access on MCU UART protocol (removed fixed whitelist dependency) with RAM-range safety checks in `ICS2_RX26T.c`.
 - Added dynamic scope channel binding (`slot + type + address`) so GUI channels can sample arbitrary variables instead of fixed M1..M12 source mapping.
 - Updated PC protocol client (`IcsProtocolService`) and scope start flow (`MainViewModel`) to send address/type metadata per channel and support alias/display-name variable resolution.

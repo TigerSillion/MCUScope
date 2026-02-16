@@ -111,7 +111,7 @@
 
             <!-- Center Panel: Scope Charts -->
             <DockPanel Grid.Column="2">
-                <TabControl DockPanel.Dock="Top" Height="*" Margin="4">
+                <TabControl DockPanel.Dock="Top" Margin="4">
                     <!-- Main Scope Chart Tab -->
                     <TabItem Header="Scope Chart">
                         <DockPanel>
