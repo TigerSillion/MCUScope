@@ -1,6 +1,19 @@
 # DEV_LOG.md
 
 ## 2026-02-16
+Summary: Added automation tooling for MCU dependency regression checks and UART protocol smoke testing.
+Files: tools/check_mcu_artifacts.py, tools/uart_smoke.py, docs/USAGE.md, docs/TESTING.md, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- Added `tools/check_mcu_artifacts.py` to verify replacement source files are present, RCPC/makefile no longer reference removed closed libs, and (optionally) map files contain replacement objects and no legacy `.lib` usage.
+- Added `tools/uart_smoke.py` to run UART protocol smoke flows over serial (`GetInfo`, optional variable read/write, optional scope start/stop and waveform wait).
+- Added `--dry-run` path in UART smoke tool to validate packet generation and parser helpers without hardware.
+- Updated usage/testing docs with concrete command lines for host-only checks and hardware smoke runs.
+Tests:
+- `python tools/check_mcu_artifacts.py` executed; passed.
+- `python tools/uart_smoke.py --dry-run --scope --scope-channels 0,1 --read-var com_u1_system_mode:0x00001829 --write-var com_u1_system_mode:0x00001829:u8:1` executed; passed.
+- `python -m py_compile tools/check_mcu_artifacts.py tools/uart_smoke.py` executed; passed.
+
+## 2026-02-16
 Summary: Fixed PC GUI compile blockers in WPF dialog and project icon configuration.
 Files: src/MCUScope/Dialogs/CustomControlPanelDialog.xaml.cs, src/MCUScope/MCUScope.csproj, docs/CHANGELOG.md, docs/DEV_LOG.md.
 Behavior:

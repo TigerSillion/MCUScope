@@ -1,6 +1,8 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Added `tools/check_mcu_artifacts.py` to verify replacement C sources are present and closed MCU libs are no longer referenced by project config (optional map-file strict validation included).
+- Added `tools/uart_smoke.py` for UART protocol smoke testing with dry-run packet generation plus live GetInfo/read/write/scope checks.
 - Fixed GUI build blockers by adding the missing `ToggleButton` namespace import and removing a missing icon reference from `MCUScope.csproj`.
 - Added `ICS2_RX26T.c` UART protocol implementation in the RX26T firmware reference project, replacing the closed ICS communication library path.
 - Added MCU-side whitelist-based variable read/write and 12-channel scope waveform streaming over UART frames.

@@ -11,6 +11,27 @@
 - Flux weakening / OPL damping / OPL2LESS switching helper path
 - Flying-start state-action sequence
 - Torque vibration compensation function path (LUT and PAT entry points)
+- Automated project/link dependency regression check
+- Automated UART protocol smoke execution script
+
+## Automated Checks (Host Side)
+
+Run from repository root:
+
+1. Project/source dependency check (no hardware needed):
+`python tools/check_mcu_artifacts.py`
+
+2. Optional map-level verification (requires a fresh firmware build artifact):
+`python tools/check_mcu_artifacts.py --map Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/HardwareDebug/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.map`
+
+3. UART smoke dry-run (packet build and parser path check):
+`python tools/uart_smoke.py --dry-run --scope --scope-channels 0,1`
+
+4. UART smoke on hardware (`pyserial` required):
+`python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-channels 0,1`
+
+5. UART variable read/write smoke on hardware:
+`python tools/uart_smoke.py --port COM5 --read-var com_u1_system_mode:0x00001829 --write-var com_u1_system_mode:0x00001829:u8:1`
 
 ## PC-side Checks
 
@@ -52,6 +73,6 @@ After any protocol or variable map change:
 
 ## Current Gaps
 
-- No automated unit test harness exists yet for MCU protocol parser.
+- No pure unit test project exists for GUI protocol handlers; current automation is script-based smoke coverage.
 - Hardware-in-loop validation is required for timing and throughput confirmation.
 - Control-loop dynamic behavior must be tuned and verified on real motor/inverter hardware.

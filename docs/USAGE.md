@@ -56,6 +56,29 @@ Current default UART config in firmware:
 - Scope channel data source is fixed to 12 predefined runtime signals in `ICS2_RX26T.c`.
 - The open C replacements focus on deterministic and maintainable behavior first; control tuning may need retuning on real hardware.
 
+## Automation Tools
+
+Use these scripts from repository root to speed up regression checks.
+
+1. Verify project/link settings are detached from old closed libs:
+`python tools/check_mcu_artifacts.py`
+
+2. Validate a concrete linker output (after rebuilding firmware in Renesas IDE):
+`python tools/check_mcu_artifacts.py --map Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/HardwareDebug/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.map`
+
+3. Dry-run UART packet generation (no hardware required):
+`python tools/uart_smoke.py --dry-run --scope --scope-channels 0,1`
+
+4. Execute live UART smoke test with target board:
+`python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-channels 0,1`
+
+5. Optional variable read/write in smoke test:
+`python tools/uart_smoke.py --port COM5 --read-var com_u1_system_mode:0x00001829 --write-var com_u1_system_mode:0x00001829:u8:1`
+
+Notes:
+- `tools/uart_smoke.py` requires `pyserial` for live mode (`pip install pyserial`).
+- `--map` validation is strict and should be run with a freshly generated `.map` file.
+
 ## Closed Lib Replacement Status
 
 The following former closed libraries are now replaced by C source files in the firmware project:
