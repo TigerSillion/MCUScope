@@ -493,7 +493,9 @@ namespace MCUScope.ViewModels
         private void ConnectPort()
         {
             if (string.IsNullOrEmpty(SelectedPort)) return;
-            int baudRate = (int)(Settings.Communication.BaseClockMHz * 1000000 / 8);
+            int baudRate = Settings.Communication.BaudRate > 0
+                ? Settings.Communication.BaudRate
+                : (int)(Settings.Communication.BaseClockMHz * 1_000_000 / 8);
             _serialService.Open(SelectedPort, baudRate);
             _icsService.RequestInfo();
         }

@@ -8,6 +8,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -16,18 +17,22 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <TextBlock Grid.Row="0" Grid.Column="0" Text="Scope Base Clock (MHz):" VerticalAlignment="Center" Margin="0,4"/>
-        <TextBox Grid.Row="0" Grid.Column="1" x:Name="ClockTextBox" Margin="8,4" Width="100"
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Baud Rate (bps):" VerticalAlignment="Center" Margin="0,4"/>
+        <TextBox Grid.Row="0" Grid.Column="1" x:Name="BaudRateTextBox" Margin="8,4" Width="140"
                  HorizontalAlignment="Left" VerticalContentAlignment="Center"/>
 
-        <TextBlock Grid.Row="1" Grid.Column="0" Text="Communication Rate:" VerticalAlignment="Center" Margin="0,4"/>
-        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="RateText" Margin="8,4" VerticalAlignment="Center"/>
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="ICS Base Clock (MHz):" VerticalAlignment="Center" Margin="0,4"/>
+        <TextBox Grid.Row="1" Grid.Column="1" x:Name="ClockTextBox" Margin="8,4" Width="100"
+                 HorizontalAlignment="Left" VerticalContentAlignment="Center"/>
 
-        <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,8" FontSize="10" Foreground="Gray"
+        <TextBlock Grid.Row="2" Grid.Column="0" Text="Effective Rate:" VerticalAlignment="Center" Margin="0,4"/>
+        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="RateText" Margin="8,4" VerticalAlignment="Center"/>
+
+        <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,8" FontSize="10" Foreground="Gray"
                    TextWrapping="Wrap"
-                   Text="Set the clock frequency which is 8 times the communication rate. For example, if communication rate is 1Mbps, set 8.0 MHz."/>
+                   Text="Baud rate is used for UART. ICS base clock is optional for compatibility; effective rate is baseClock/8 if baud rate is empty."/>
 
-        <StackPanel Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2"
+        <StackPanel Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2"
                     Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button Content="OK" Width="80" Margin="4" Click="OnOk" IsDefault="True"/>
             <Button Content="Cancel" Width="80" Margin="4" Click="OnCancel" IsCancel="True"/>
