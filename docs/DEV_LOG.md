@@ -1,6 +1,14 @@
 # DEV_LOG.md
 
 ## 2026-02-16
+Summary: Fixed PC GUI compile blockers in WPF dialog and project icon configuration.
+Files: src/MCUScope/Dialogs/CustomControlPanelDialog.xaml.cs, src/MCUScope/MCUScope.csproj, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- Added `System.Windows.Controls.Primitives` import so `ToggleButton` resolves during WPF build.
+- Removed missing icon reference (`Resources\\mcuscope.ico`) from `MCUScope.csproj` to unblock compilation in current workspace.
+Tests: `dotnet build MCUScope.sln` executed; build succeeds with warnings only (`MainViewModel` unused/private fields).
+
+## 2026-02-16
 Summary: Replaced all remaining closed motor helper `.lib` modules with open C source implementations and removed linker dependencies from the RX26T project config.
 Files: Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/src/application/motor_module/current/r_motor_current_bemf_observer.c, Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/src/application/motor_module/current/r_motor_current_stall_detection.c, Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/src/application/motor_module/current/r_motor_current_trq_vib_comp.c, Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/src/application/motor_module/current/r_motor_current_volt_err_comp.c, Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/src/application/motor_module/sensorless_vector/r_motor_sensorless_vector_flyingstart.c, Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/src/application/motor_module/speed/r_motor_speed_fluxwkn.c, Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/src/application/motor_module/speed/r_motor_speed_opl_damp_ctrl.c, Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/src/application/motor_module/speed/r_motor_speed_opl2less.c, Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.rcpc, Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/HardwareDebug/makefile, Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/src/application/user_interface/ics/ICS2_RX26T.h, AGENTS.md, docs/AI_RULES.md, docs/AGENT_MCP_SKILLS.md, docs/USAGE.md, docs/TESTING.md, docs/CHANGELOG.md, docs/DEV_LOG.md.
 Behavior:

@@ -1,6 +1,7 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Fixed GUI build blockers by adding the missing `ToggleButton` namespace import and removing a missing icon reference from `MCUScope.csproj`.
 - Added `ICS2_RX26T.c` UART protocol implementation in the RX26T firmware reference project, replacing the closed ICS communication library path.
 - Added MCU-side whitelist-based variable read/write and 12-channel scope waveform streaming over UART frames.
 - Updated PC protocol sender to use exact payload lengths for `StartScope` and `SetTrigger`.

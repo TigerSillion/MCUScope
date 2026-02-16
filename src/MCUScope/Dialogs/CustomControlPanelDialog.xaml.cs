@@ -2,6 +2,7 @@ using MCUScope.ViewModels;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 
 namespace MCUScope.Dialogs
 {
