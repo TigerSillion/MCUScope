@@ -1,0 +1,686 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<MicomToolCommonProjectFile Version="1.00">
+  <CreatorType Name="e2studio" Version=""/>
+  <Placeholders>
+    <PlaceholderPrefix>${</PlaceholderPrefix>
+    <PlaceholderPostfix>}</PlaceholderPostfix>
+  </Placeholders>
+  <Project Name="RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100" Type="Application">
+    <Files>
+      <Category Name="src">
+        <Category Name="application">
+          <Path>src\application\main.c</Path>
+          <Category Name="main">
+            <Path>src\application\main\mtr_interrupt.c</Path>
+            <Path>src\application\main\mtr_interrupt.h</Path>
+            <Path>src\application\main\mtr_main.c</Path>
+            <Path>src\application\main\mtr_main.h</Path>
+          </Category>
+          <Category Name="mcu">
+            <Category Name="rx26t">
+              <Path>src\application\mcu\rx26t\r_app_mcu.c</Path>
+              <Path>src\application\mcu\rx26t\r_app_mcu.h</Path>
+              <Path>src\application\mcu\rx26t\r_motor_driver_hal.h</Path>
+              <Path>src\application\mcu\rx26t\r_motor_driver_smc.c</Path>
+            </Category>
+          </Category>
+          <Category Name="motor_module">
+            <Category Name="cfg">
+              <Path>src\application\motor_module\cfg\r_motor_inverter_cfg.h</Path>
+              <Path>src\application\motor_module\cfg\r_motor_module_cfg.h</Path>
+              <Path>src\application\motor_module\cfg\r_motor_targetmotor_cfg.h</Path>
+            </Category>
+            <Category Name="current">
+              <Path>src\application\motor_module\current\r_motor_current.c</Path>
+              <Path>src\application\motor_module\current\r_motor_current.h</Path>
+              <Path>src\application\motor_module\current\r_motor_current_api.c</Path>
+              <Path>src\application\motor_module\current\r_motor_current_api.h</Path>
+              <Path>src\application\motor_module\current\r_motor_current_bemf_observer.h</Path>
+              <Path>src\application\motor_module\current\r_motor_current_modulation.c</Path>
+              <Path>src\application\motor_module\current\r_motor_current_modulation.h</Path>
+              <Path>src\application\motor_module\current\r_motor_current_pi_gain_calc.c</Path>
+              <Path>src\application\motor_module\current\r_motor_current_stall_detection.h</Path>
+              <Path>src\application\motor_module\current\r_motor_current_trq_vib_comp.h</Path>
+              <Path>src\application\motor_module\current\r_motor_current_volt_err_comp.h</Path>
+            </Category>
+            <Category Name="driver">
+              <Path>src\application\motor_module\driver\r_motor_driver.c</Path>
+              <Path>src\application\motor_module\driver\r_motor_driver.h</Path>
+            </Category>
+            <Category Name="general">
+              <Path>src\application\motor_module\general\r_motor_common.h</Path>
+              <Path>src\application\motor_module\general\r_motor_filter.c</Path>
+              <Path>src\application\motor_module\general\r_motor_filter.h</Path>
+              <Path>src\application\motor_module\general\r_motor_pi_control.c</Path>
+              <Path>src\application\motor_module\general\r_motor_pi_control.h</Path>
+            </Category>
+            <Category Name="sensorless_vector">
+              <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_action.c</Path>
+              <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_api.c</Path>
+              <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_api.h</Path>
+              <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_flyingstart.h</Path>
+              <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_manager.c</Path>
+              <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_manager.h</Path>
+              <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_protection.c</Path>
+              <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_protection.h</Path>
+              <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_statemachine.c</Path>
+              <Path>src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_statemachine.h</Path>
+            </Category>
+            <Category Name="speed">
+              <Path>src\application\motor_module\speed\r_motor_speed.c</Path>
+              <Path>src\application\motor_module\speed\r_motor_speed.h</Path>
+              <Path>src\application\motor_module\speed\r_motor_speed_api.c</Path>
+              <Path>src\application\motor_module\speed\r_motor_speed_api.h</Path>
+              <Path>src\application\motor_module\speed\r_motor_speed_fluxwkn.h</Path>
+              <Path>src\application\motor_module\speed\r_motor_speed_mtpa.c</Path>
+              <Path>src\application\motor_module\speed\r_motor_speed_mtpa.h</Path>
+              <Path>src\application\motor_module\speed\r_motor_speed_opl2less.h</Path>
+              <Path>src\application\motor_module\speed\r_motor_speed_opl_damp_ctrl.h</Path>
+              <Path>src\application\motor_module\speed\r_motor_speed_pi_gain_calc.c</Path>
+            </Category>
+          </Category>
+          <Category Name="system_module">
+            <Category Name="system_manager">
+              <Path>src\application\system_module\system_manager\r_system_manager.c</Path>
+              <Path>src\application\system_module\system_manager\r_system_manager.h</Path>
+              <Path>src\application\system_module\system_manager\r_system_manager_api.c</Path>
+              <Path>src\application\system_module\system_manager\r_system_manager_api.h</Path>
+            </Category>
+          </Category>
+          <Category Name="user_interface">
+            <Category Name="board_ui">
+              <Path>src\application\user_interface\board_ui\r_app_board_ui.c</Path>
+              <Path>src\application\user_interface\board_ui\r_app_board_ui.h</Path>
+            </Category>
+            <Category Name="ics">
+              <Path>src\application\user_interface\ics\ICS2_RX26T.h</Path>
+              <Path>src\application\user_interface\ics\ICS2_RX26T.c</Path>
+              <Path>src\application\user_interface\ics\r_mtr_ics.c</Path>
+              <Path>src\application\user_interface\ics\r_mtr_ics.h</Path>
+            </Category>
+          </Category>
+        </Category>
+        <Category Name="smc_gen">
+          <Category Name="Config_CMT0">
+            <Path>src\smc_gen\Config_CMT0\Config_CMT0.c</Path>
+            <Path>src\smc_gen\Config_CMT0\Config_CMT0.h</Path>
+            <Path>src\smc_gen\Config_CMT0\Config_CMT0_user.c</Path>
+          </Category>
+          <Category Name="Config_GPT0">
+            <Path>src\smc_gen\Config_GPT0\Config_GPT0.c</Path>
+            <Path>src\smc_gen\Config_GPT0\Config_GPT0.h</Path>
+            <Path>src\smc_gen\Config_GPT0\Config_GPT0_user.c</Path>
+          </Category>
+          <Category Name="Config_GPT1">
+            <Path>src\smc_gen\Config_GPT1\Config_GPT1.c</Path>
+            <Path>src\smc_gen\Config_GPT1\Config_GPT1.h</Path>
+            <Path>src\smc_gen\Config_GPT1\Config_GPT1_user.c</Path>
+          </Category>
+          <Category Name="Config_GPT2">
+            <Path>src\smc_gen\Config_GPT2\Config_GPT2.c</Path>
+            <Path>src\smc_gen\Config_GPT2\Config_GPT2.h</Path>
+            <Path>src\smc_gen\Config_GPT2\Config_GPT2_user.c</Path>
+          </Category>
+          <Category Name="Config_IWDT">
+            <Path>src\smc_gen\Config_IWDT\Config_IWDT.c</Path>
+            <Path>src\smc_gen\Config_IWDT\Config_IWDT.h</Path>
+            <Path>src\smc_gen\Config_IWDT\Config_IWDT_user.c</Path>
+          </Category>
+          <Category Name="Config_POEG">
+            <Path>src\smc_gen\Config_POEG\Config_POEG.c</Path>
+            <Path>src\smc_gen\Config_POEG\Config_POEG.h</Path>
+            <Path>src\smc_gen\Config_POEG\Config_POEG_user.c</Path>
+          </Category>
+          <Category Name="Config_PORT">
+            <Path>src\smc_gen\Config_PORT\Config_PORT.c</Path>
+            <Path>src\smc_gen\Config_PORT\Config_PORT.h</Path>
+            <Path>src\smc_gen\Config_PORT\Config_PORT_user.c</Path>
+          </Category>
+          <Category Name="Config_S12AD0">
+            <Path>src\smc_gen\Config_S12AD0\Config_S12AD0.c</Path>
+            <Path>src\smc_gen\Config_S12AD0\Config_S12AD0.h</Path>
+            <Path>src\smc_gen\Config_S12AD0\Config_S12AD0_user.c</Path>
+          </Category>
+          <Category Name="Config_S12AD2">
+            <Path>src\smc_gen\Config_S12AD2\Config_S12AD2.c</Path>
+            <Path>src\smc_gen\Config_S12AD2\Config_S12AD2.h</Path>
+            <Path>src\smc_gen\Config_S12AD2\Config_S12AD2_user.c</Path>
+          </Category>
+          <Category Name="general">
+            <Path>src\smc_gen\general\r_cg_cmt.h</Path>
+            <Path>src\smc_gen\general\r_cg_gpt.h</Path>
+            <Path>src\smc_gen\general\r_cg_hardware_setup.c</Path>
+            <Path>src\smc_gen\general\r_cg_iwdt.h</Path>
+            <Path>src\smc_gen\general\r_cg_macrodriver.h</Path>
+            <Path>src\smc_gen\general\r_cg_poe.h</Path>
+            <Path>src\smc_gen\general\r_cg_poeg.h</Path>
+            <Path>src\smc_gen\general\r_cg_port.h</Path>
+            <Path>src\smc_gen\general\r_cg_s12ad.h</Path>
+            <Path>src\smc_gen\general\r_cg_userdefine.h</Path>
+            <Path>src\smc_gen\general\r_smc_cgc.c</Path>
+            <Path>src\smc_gen\general\r_smc_cgc.h</Path>
+            <Path>src\smc_gen\general\r_smc_cgc_user.c</Path>
+            <Path>src\smc_gen\general\r_smc_entry.h</Path>
+            <Path>src\smc_gen\general\r_smc_interrupt.c</Path>
+            <Path>src\smc_gen\general\r_smc_interrupt.h</Path>
+          </Category>
+          <Category Name="r_bsp">
+            <Path>src\smc_gen\r_bsp\platform.h</Path>
+            <Path>src\smc_gen\r_bsp\readme.txt</Path>
+            <Category Name="board">
+              <Category Name="generic_rx26t">
+                <Path>src\smc_gen\r_bsp\board\generic_rx26t\hwsetup.c</Path>
+                <Path>src\smc_gen\r_bsp\board\generic_rx26t\hwsetup.h</Path>
+                <Path>src\smc_gen\r_bsp\board\generic_rx26t\r_bsp.h</Path>
+                <Path>src\smc_gen\r_bsp\board\generic_rx26t\r_bsp_config_reference.h</Path>
+                <Path>src\smc_gen\r_bsp\board\generic_rx26t\r_bsp_interrupt_config_reference.h</Path>
+              </Category>
+              <Category Name="user">
+                <Path>src\smc_gen\r_bsp\board\user\r_bsp.h</Path>
+              </Category>
+            </Category>
+            <Category Name="doc">
+              <Category Name="en">
+                <Path>src\smc_gen\r_bsp\doc\en\r01an1685ej0770-rx-bsp.pdf</Path>
+              </Category>
+              <Category Name="ja">
+                <Path>src\smc_gen\r_bsp\doc\ja\r01an1685jj0770-rx-bsp.pdf</Path>
+              </Category>
+            </Category>
+            <Category Name="mcu">
+              <Category Name="all">
+                <Path>src\smc_gen\r_bsp\mcu\all\dbsct.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\fsp_common_api.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\lowlvl.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\lowlvl.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\lowsrc.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\lowsrc.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\mcu_locks.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_bsp_common.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_bsp_common.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_bsp_cpu.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_bsp_interrupts.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_bsp_interrupts.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_bsp_locking.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_bsp_mcu_startup.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_bsp_mcu_startup.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_bsp_software_interrupt.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_bsp_software_interrupt.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_fsp_error.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_rtos.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_rx_compiler.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_rx_intrinsic_functions.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_rx_intrinsic_functions.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\r_typedefs.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\resetprg.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\sbrk.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\all\sbrk.h</Path>
+              </Category>
+              <Category Name="rx26t">
+                <Path>src\smc_gen\r_bsp\mcu\rx26t\mcu_clocks.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\rx26t\mcu_clocks.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\rx26t\mcu_info.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\rx26t\mcu_init.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\rx26t\mcu_init.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\rx26t\mcu_interrupts.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\rx26t\mcu_interrupts.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\rx26t\mcu_locks.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\rx26t\mcu_mapped_interrupts.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\rx26t\mcu_mapped_interrupts.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\rx26t\mcu_mapped_interrupts_private.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\rx26t\r_bsp_cpu.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\rx26t\r_bsp_locking.h</Path>
+                <Path>src\smc_gen\r_bsp\mcu\rx26t\vecttbl.c</Path>
+                <Path>src\smc_gen\r_bsp\mcu\rx26t\vecttbl.h</Path>
+                <Category Name="register_access">
+                  <Category Name="ccrx">
+                    <Path>src\smc_gen\r_bsp\mcu\rx26t\register_access\ccrx\iodefine.h</Path>
+                  </Category>
+                </Category>
+              </Category>
+            </Category>
+          </Category>
+          <Category Name="r_config">
+            <Path>src\smc_gen\r_config\r_bsp_config.h</Path>
+            <Path>src\smc_gen\r_config\r_bsp_config_readme.txt</Path>
+            <Path>src\smc_gen\r_config\r_bsp_interrupt_config.h</Path>
+          </Category>
+          <Category Name="r_pincfg">
+            <Path>src\smc_gen\r_pincfg\Pin.c</Path>
+            <Path>src\smc_gen\r_pincfg\Pin.h</Path>
+          </Category>
+        </Category>
+      </Category>
+      <Category Name="trash">
+        <Category Name="2026-02-02-19-41-10">
+          <Category Name="src">
+            <Category Name="smc_gen">
+              <Category Name="Config_CMT0">
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_CMT0\Config_CMT0.c</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_CMT0\Config_CMT0.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_CMT0\Config_CMT0_user.c</Path>
+              </Category>
+              <Category Name="Config_GPT0">
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_GPT0\Config_GPT0.c</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_GPT0\Config_GPT0.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_GPT0\Config_GPT0_user.c</Path>
+              </Category>
+              <Category Name="Config_GPT1">
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_GPT1\Config_GPT1.c</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_GPT1\Config_GPT1.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_GPT1\Config_GPT1_user.c</Path>
+              </Category>
+              <Category Name="Config_GPT2">
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_GPT2\Config_GPT2.c</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_GPT2\Config_GPT2.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_GPT2\Config_GPT2_user.c</Path>
+              </Category>
+              <Category Name="Config_IWDT">
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_IWDT\Config_IWDT.c</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_IWDT\Config_IWDT.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_IWDT\Config_IWDT_user.c</Path>
+              </Category>
+              <Category Name="Config_POEG">
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_POEG\Config_POEG.c</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_POEG\Config_POEG.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_POEG\Config_POEG_user.c</Path>
+              </Category>
+              <Category Name="Config_PORT">
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_PORT\Config_PORT.c</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_PORT\Config_PORT.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_PORT\Config_PORT_user.c</Path>
+              </Category>
+              <Category Name="Config_S12AD0">
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_S12AD0\Config_S12AD0.c</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_S12AD0\Config_S12AD0.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_S12AD0\Config_S12AD0_user.c</Path>
+              </Category>
+              <Category Name="Config_S12AD2">
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_S12AD2\Config_S12AD2.c</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_S12AD2\Config_S12AD2.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\Config_S12AD2\Config_S12AD2_user.c</Path>
+              </Category>
+              <Category Name="general">
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_cg_cmt.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_cg_gpt.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_cg_hardware_setup.c</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_cg_iwdt.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_cg_macrodriver.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_cg_poe.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_cg_poeg.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_cg_port.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_cg_s12ad.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_cg_userdefine.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_smc_cgc.c</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_smc_cgc.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_smc_cgc_user.c</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_smc_entry.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_smc_interrupt.c</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\general\r_smc_interrupt.h</Path>
+              </Category>
+              <Category Name="r_bsp">
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\platform.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\readme.txt</Path>
+                <Category Name="board">
+                  <Category Name="generic_rx26t">
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\board\generic_rx26t\hwsetup.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\board\generic_rx26t\hwsetup.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\board\generic_rx26t\r_bsp.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\board\generic_rx26t\r_bsp_config_reference.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\board\generic_rx26t\r_bsp_interrupt_config_reference.h</Path>
+                  </Category>
+                  <Category Name="user">
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\board\user\r_bsp.h</Path>
+                  </Category>
+                </Category>
+                <Category Name="mcu">
+                  <Category Name="all">
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\dbsct.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\fsp_common_api.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\lowlvl.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\lowlvl.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\lowsrc.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\lowsrc.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\mcu_locks.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_common.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_common.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_cpu.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_interrupts.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_interrupts.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_locking.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_mcu_startup.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_mcu_startup.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_software_interrupt.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_software_interrupt.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_fsp_error.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_rtos.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_rx_compiler.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_rx_intrinsic_functions.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_rx_intrinsic_functions.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_typedefs.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\resetprg.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\sbrk.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\sbrk.h</Path>
+                  </Category>
+                  <Category Name="rx26t">
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\mcu_clocks.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\mcu_clocks.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\mcu_info.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\mcu_init.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\mcu_init.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\mcu_interrupts.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\mcu_interrupts.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\mcu_locks.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\mcu_mapped_interrupts.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\mcu_mapped_interrupts.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\mcu_mapped_interrupts_private.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\r_bsp_cpu.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\r_bsp_locking.h</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\vecttbl.c</Path>
+                    <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\vecttbl.h</Path>
+                    <Category Name="register_access">
+                      <Category Name="ccrx">
+                        <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\register_access\ccrx\iodefine.h</Path>
+                      </Category>
+                    </Category>
+                  </Category>
+                </Category>
+              </Category>
+              <Category Name="r_config">
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_config\r_bsp_config.h</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_config\r_bsp_config_readme.txt</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_config\r_bsp_interrupt_config.h</Path>
+              </Category>
+              <Category Name="r_pincfg">
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_pincfg\Pin.c</Path>
+                <Path>trash\2026-02-02-19-41-10\src\smc_gen\r_pincfg\Pin.h</Path>
+              </Category>
+            </Category>
+          </Category>
+        </Category>
+      </Category>
+    </Files>
+    <Device Category="com.renesas.cdt.managedbuild.renesas.ccrx.common.option.cpu.rx200" Series="RX">R5F526TFCxFP</Device>
+    <BuildOptions Name="CC-RX" Version="v3.07.00">
+      <BuildMode Active="True" Name="HardwareDebug">
+        <GeneralOptions>
+          <CommandsAfter>xcopy ${ProjName}.map ..\src\application\user_interface\ics /y</CommandsAfter>
+        </GeneralOptions>
+        <CompileOptions>
+          <Option>-isa=rxv3</Option>
+          <Option>-fpu</Option>
+          <Option>-include="${ProjDirPath}\src\application\motor_module\speed"</Option>
+          <Option>-include="${ProjDirPath}\src\application\motor_module\sensorless_vector"</Option>
+          <Option>-include="${ProjDirPath}\src\application\motor_module\cfg"</Option>
+          <Option>-include="${ProjDirPath}\src\application\motor_module"</Option>
+          <Option>-include="${ProjDirPath}\src\application\motor_module\driver"</Option>
+          <Option>-include="${ProjDirPath}\src\application\motor_module\general"</Option>
+          <Option>-include="${ProjDirPath}\src\application\user_interface\ics"</Option>
+          <Option>-include="${ProjDirPath}\src\application\user_interface\board_ui"</Option>
+          <Option>-include="${ProjDirPath}\src\application\mcu\rx26t"</Option>
+          <Option>-include="${ProjDirPath}\src\application\main"</Option>
+          <Option>-include="${ProjDirPath}\src\application\system_module\system_manager"</Option>
+          <Option>-include="${ProjDirPath}\src\application\mcu"</Option>
+          <Option>-include="${ProjDirPath}\src\application"</Option>
+          <Option>-include="${ProjDirPath}\src\application\motor_module\current"</Option>
+          <Option>-include="${ProjDirPath}\src\application\user_interface"</Option>
+          <Option>-include="${ProjDirPath}\src\application\system_module"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_pincfg"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\general"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_PORT"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_CMT0"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_IWDT"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_bsp"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_config"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_POEG"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_S12AD0"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_GPT1"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_GPT2"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_GPT0"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_S12AD2"</Option>
+          <Option>-asmopt=-bank</Option>
+          <Option>-utf8</Option>
+          <Option>-nomessage</Option>
+          <Option>-debug</Option>
+          <Option>-outcode=utf8</Option>
+          <Option>-tfu=intrinsic,mathlib</Option>
+          <Option>-tfu_version=v2</Option>
+          <Option>-nologo</Option>
+          <Option>-lang=c99</Option>
+          <Option>-lang=cpp</Option>
+          <Option>-output=obj=${CONFIGDIR}\${FILELEAF}.obj</Option>
+          <Option>-obj_path=${CONFIGDIR}</Option>
+        </CompileOptions>
+        <AssembleOptions>
+          <Option>-isa=rxv3</Option>
+          <Option>-fpu</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_pincfg"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\general"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_PORT"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_CMT0"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_IWDT"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_bsp"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\r_config"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_POEG"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_S12AD0"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_GPT1"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_GPT2"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_GPT0"</Option>
+          <Option>-include="${ProjDirPath}\src\smc_gen\Config_S12AD2"</Option>
+          <Option>-utf8</Option>
+          <Option>-bank</Option>
+          <Option>-debug</Option>
+          <Option>-nologo</Option>
+          <Option>-output=${CONFIGDIR}</Option>
+        </AssembleOptions>
+        <LinkOptions>
+          <Option>-output="${ProjName}.abs"</Option>
+          <Option>-form=absolute</Option>
+          <Option>-nomessage</Option>
+          <Option>-vect=_undefined_interrupt_source_isr</Option>
+          <Option>-list</Option>
+          <Option>-show=symbol,total_size,struct</Option>
+          <Option>-nooptimize</Option>
+          <Option>-start=BDTCTBL\0,SU,SI,B_1,R_1,B_2,R_2,B,R\0400,PResetPRG,C_1,C_2,C,C$*,D*,W*,L,P\0FFF80000,EXCEPTVECT\0FFFFFF80,RESETVECT\0FFFFFFFC</Option>
+          <Option>-rom=D=R,D_1=R_1,D_2=R_2</Option>
+          <Option>-cpu=RAM=00000000-0000ffff,FIX=00080000-00083fff,FIX=00086000-00087fff,FIX=00088000-0009ffff,FIX=000a0000-000a3fff,FIX=000a6000-000bffff,FIX=000c0000-000dffff,FIX=000e0000-000fffff,ROM=00100000-00103fff,RAM=00120040-001200af,FIX=007fb174-007fb177,FIX=007fb17c-007fb17f,FIX=007fb1e4-007fb1eb,FIX=007fe000-007fffff,ROM=fff80000-ffffffff</Option>
+          <Option>-nologo</Option>
+          <Option>-library="${ProjDirPath}\src\application\motor_module\current\r_motor_current_bemf_observer.lib"</Option>
+          <Option>-library="${ProjDirPath}\src\application\motor_module\current\r_motor_current_stall_detection.lib"</Option>
+          <Option>-library="${ProjDirPath}\src\application\motor_module\current\r_motor_current_trq_vib_comp.lib"</Option>
+          <Option>-library="${ProjDirPath}\src\application\motor_module\current\r_motor_current_volt_err_comp.lib"</Option>
+          <Option>-library="${ProjDirPath}\src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_flyingstart.lib"</Option>
+          <Option>-library="${ProjDirPath}\src\application\motor_module\speed\r_motor_speed_fluxwkn.lib"</Option>
+          <Option>-library="${ProjDirPath}\src\application\motor_module\speed\r_motor_speed_opl_damp_ctrl.lib"</Option>
+          <Option>-library="${ProjDirPath}\src\application\motor_module\speed\r_motor_speed_opl2less.lib"</Option>
+          <Option>-start=BDTCTBL/0,SU,SI,B_1,R_1,B_2,R_2,B,R/0400,PResetPRG,C_1,C_2,C,C$*,D*,W*,L,P/0FFF80000,EXCEPTVECT/0FFFFFF80,RESETVECT/0FFFFFFFC</Option>
+          <Option>-end</Option>
+          <Option>-output="${ProjName}.mot"</Option>
+          <Option>-form=stype</Option>
+          <Option>-byte_count=10</Option>
+          <Option>-nologo</Option>
+          <Option>-nomessage</Option>
+          <Option>-exit</Option>
+          <PreLinker>Auto</PreLinker>
+        </LinkOptions>
+        <LibraryGenerateOptions>
+          <Option>-isa=rxv3</Option>
+          <Option>-fpu</Option>
+          <Option>-lang=c99</Option>
+          <Option>-head=runtime,math,stdio,stdlib,string,new</Option>
+          <Option>-output="${ProjName}.lib"</Option>
+          <Option>-nologo</Option>
+          <GenerateMode>BuildOptionChanged</GenerateMode>
+        </LibraryGenerateOptions>
+        <LinkOrder>
+          <Path>HardwareDebug\RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.lib</Path>
+          <Path>HardwareDebug\Config_CMT0.obj</Path>
+          <Path>HardwareDebug\Config_CMT0_user.obj</Path>
+          <Path>HardwareDebug\Config_IWDT.obj</Path>
+          <Path>HardwareDebug\Config_IWDT_user.obj</Path>
+          <Path>HardwareDebug\Config_PORT.obj</Path>
+          <Path>HardwareDebug\Config_PORT_user.obj</Path>
+          <Path>HardwareDebug\r_cg_hardware_setup.obj</Path>
+          <Path>HardwareDebug\r_smc_cgc.obj</Path>
+          <Path>HardwareDebug\r_smc_cgc_user.obj</Path>
+          <Path>HardwareDebug\r_smc_interrupt.obj</Path>
+          <Path>HardwareDebug\hwsetup.obj</Path>
+          <Path>HardwareDebug\dbsct.obj</Path>
+          <Path>HardwareDebug\lowlvl.obj</Path>
+          <Path>HardwareDebug\lowsrc.obj</Path>
+          <Path>HardwareDebug\mcu_locks.obj</Path>
+          <Path>HardwareDebug\r_bsp_common.obj</Path>
+          <Path>HardwareDebug\r_bsp_cpu.obj</Path>
+          <Path>HardwareDebug\r_bsp_interrupts.obj</Path>
+          <Path>HardwareDebug\r_bsp_locking.obj</Path>
+          <Path>HardwareDebug\r_bsp_mcu_startup.obj</Path>
+          <Path>HardwareDebug\r_bsp_software_interrupt.obj</Path>
+          <Path>HardwareDebug\r_rx_intrinsic_functions.obj</Path>
+          <Path>HardwareDebug\resetprg.obj</Path>
+          <Path>HardwareDebug\sbrk.obj</Path>
+          <Path>HardwareDebug\mcu_clocks.obj</Path>
+          <Path>HardwareDebug\mcu_init.obj</Path>
+          <Path>HardwareDebug\mcu_interrupts.obj</Path>
+          <Path>HardwareDebug\mcu_mapped_interrupts.obj</Path>
+          <Path>HardwareDebug\vecttbl.obj</Path>
+          <Path>HardwareDebug\Pin.obj</Path>
+          <Path>HardwareDebug\Config_GPT1.obj</Path>
+          <Path>HardwareDebug\Config_GPT1_user.obj</Path>
+          <Path>HardwareDebug\mtr_main.obj</Path>
+          <Path>HardwareDebug\main.obj</Path>
+          <Path>HardwareDebug\r_app_mcu.obj</Path>
+          <Path>HardwareDebug\r_motor_driver_smc.obj</Path>
+          <Path>HardwareDebug\r_motor_current.obj</Path>
+          <Path>HardwareDebug\r_motor_current_api.obj</Path>
+          <Path>HardwareDebug\r_motor_current_modulation.obj</Path>
+          <Path>HardwareDebug\r_motor_current_pi_gain_calc.obj</Path>
+          <Path>HardwareDebug\r_motor_driver.obj</Path>
+          <Path>HardwareDebug\r_motor_filter.obj</Path>
+          <Path>HardwareDebug\r_motor_pi_control.obj</Path>
+          <Path>HardwareDebug\r_motor_sensorless_vector_action.obj</Path>
+          <Path>HardwareDebug\r_motor_sensorless_vector_api.obj</Path>
+          <Path>HardwareDebug\r_motor_sensorless_vector_manager.obj</Path>
+          <Path>HardwareDebug\r_motor_sensorless_vector_protection.obj</Path>
+          <Path>HardwareDebug\r_motor_sensorless_vector_statemachine.obj</Path>
+          <Path>HardwareDebug\r_motor_speed.obj</Path>
+          <Path>HardwareDebug\r_motor_speed_api.obj</Path>
+          <Path>HardwareDebug\r_motor_speed_mtpa.obj</Path>
+          <Path>HardwareDebug\r_motor_speed_pi_gain_calc.obj</Path>
+          <Path>HardwareDebug\r_system_manager.obj</Path>
+          <Path>HardwareDebug\r_system_manager_api.obj</Path>
+          <Path>HardwareDebug\r_mtr_ics.obj</Path>
+          <Path>HardwareDebug\mtr_interrupt.obj</Path>
+          <Path>HardwareDebug\r_app_board_ui.obj</Path>
+          <Path>HardwareDebug\Config_GPT0.obj</Path>
+          <Path>HardwareDebug\Config_GPT0_user.obj</Path>
+          <Path>HardwareDebug\Config_GPT2.obj</Path>
+          <Path>HardwareDebug\Config_GPT2_user.obj</Path>
+          <Path>HardwareDebug\Config_POEG.obj</Path>
+          <Path>HardwareDebug\Config_POEG_user.obj</Path>
+          <Path>HardwareDebug\Config_S12AD0.obj</Path>
+          <Path>HardwareDebug\Config_S12AD0_user.obj</Path>
+          <Path>HardwareDebug\Config_S12AD2.obj</Path>
+          <Path>HardwareDebug\Config_S12AD2_user.obj</Path>
+          <Path>${ProjDirPath}\src\application\motor_module\current\r_motor_current_bemf_observer.lib</Path>
+          <Path>${ProjDirPath}\src\application\motor_module\current\r_motor_current_stall_detection.lib</Path>
+          <Path>${ProjDirPath}\src\application\motor_module\current\r_motor_current_trq_vib_comp.lib</Path>
+          <Path>${ProjDirPath}\src\application\motor_module\current\r_motor_current_volt_err_comp.lib</Path>
+          <Path>${ProjDirPath}\src\application\motor_module\sensorless_vector\r_motor_sensorless_vector_flyingstart.lib</Path>
+          <Path>${ProjDirPath}\src\application\motor_module\speed\r_motor_speed_fluxwkn.lib</Path>
+          <Path>${ProjDirPath}\src\application\motor_module\speed\r_motor_speed_opl_damp_ctrl.lib</Path>
+          <Path>${ProjDirPath}\src\application\motor_module\speed\r_motor_speed_opl2less.lib</Path>
+        </LinkOrder>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_CMT0\Config_CMT0.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_CMT0\Config_CMT0_user.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_GPT0\Config_GPT0.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_GPT0\Config_GPT0_user.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_GPT1\Config_GPT1.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_GPT1\Config_GPT1_user.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_GPT2\Config_GPT2.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_GPT2\Config_GPT2_user.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_IWDT\Config_IWDT.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_IWDT\Config_IWDT_user.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_POEG\Config_POEG.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_POEG\Config_POEG_user.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_PORT\Config_PORT.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_PORT\Config_PORT_user.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_S12AD0\Config_S12AD0.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_S12AD0\Config_S12AD0_user.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_S12AD2\Config_S12AD2.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\Config_S12AD2\Config_S12AD2_user.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\general\r_cg_hardware_setup.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\general\r_smc_cgc.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\general\r_smc_cgc_user.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\general\r_smc_interrupt.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\board\generic_rx26t\hwsetup.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\dbsct.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\lowlvl.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\lowsrc.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\mcu_locks.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_common.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_cpu.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_interrupts.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_locking.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_mcu_startup.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_bsp_software_interrupt.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\r_rx_intrinsic_functions.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\resetprg.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\all\sbrk.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\mcu_clocks.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\mcu_init.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\mcu_interrupts.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\mcu_mapped_interrupts.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_bsp\mcu\rx26t\vecttbl.c"/>
+        <NoTargetFile Target="trash\2026-02-02-19-41-10\src\smc_gen\r_pincfg\Pin.c"/>
+        <CommonOptions>
+          <IncludePathForC>"${ProjDirPath}\src\application\motor_module\speed"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\application\motor_module\sensorless_vector"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\application\motor_module\cfg"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\application\motor_module"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\application\motor_module\driver"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\application\motor_module\general"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\application\user_interface\ics"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\application\user_interface\board_ui"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\application\mcu\rx26t"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\application\main"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\application\system_module\system_manager"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\application\mcu"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\application"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\application\motor_module\current"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\application\user_interface"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\application\system_module"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\r_pincfg"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\general"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\Config_PORT"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\Config_CMT0"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\Config_IWDT"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\r_bsp"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\r_config"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\Config_POEG"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\Config_S12AD0"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\Config_GPT1"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\Config_GPT2"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\Config_GPT0"</IncludePathForC>
+          <IncludePathForC>"${ProjDirPath}\src\smc_gen\Config_S12AD2"</IncludePathForC>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_pincfg"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\general"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\Config_PORT"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\Config_CMT0"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\Config_IWDT"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_bsp"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\r_config"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\Config_POEG"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\Config_S12AD0"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\Config_GPT1"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\Config_GPT2"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\Config_GPT0"</IncludePathForAsm>
+          <IncludePathForAsm>"${ProjDirPath}\src\smc_gen\Config_S12AD2"</IncludePathForAsm>
+        </CommonOptions>
+      </BuildMode>
+    </BuildOptions>
+  </Project>
+</MicomToolCommonProjectFile>

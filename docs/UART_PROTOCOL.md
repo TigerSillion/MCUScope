@@ -66,7 +66,6 @@ StartScope (0x20)
 - recordLength: int32
 - channelCount: 1 byte
 - channelIndices: channelCount bytes
-- Note: the current PC implementation sends one extra trailing zero byte. MCU should accept LEN >= 9 + channelCount and ignore extra bytes.
 
 StopScope (0x21)
 - Request: empty payload
@@ -78,8 +77,6 @@ SetTrigger (0x24)
 - source: 1 byte
 - mode: 1 byte
 - edge: 1 byte
-- reserved: 1 byte (0)
-- Note: PC currently sends 12 bytes with the last byte unused.
 
 WaveformData (0x84)
 - Response from MCU to PC:

@@ -274,7 +274,7 @@ namespace MCUScope.Services
 
         public void StartScope(double samplePeriod, int recordLength, int[] channelIndices)
         {
-            var payload = new byte[10 + channelIndices.Length];
+            var payload = new byte[9 + channelIndices.Length];
             BitConverter.GetBytes((float)samplePeriod).CopyTo(payload, 0);
             BitConverter.GetBytes(recordLength).CopyTo(payload, 4);
             payload[8] = (byte)channelIndices.Length;
@@ -291,7 +291,7 @@ namespace MCUScope.Services
 
         public void SetTrigger(TriggerSettings trigger)
         {
-            var payload = new byte[12];
+            var payload = new byte[11];
             BitConverter.GetBytes((float)trigger.Position).CopyTo(payload, 0);
             BitConverter.GetBytes((float)trigger.Level).CopyTo(payload, 4);
             payload[8] = (byte)trigger.Source;
