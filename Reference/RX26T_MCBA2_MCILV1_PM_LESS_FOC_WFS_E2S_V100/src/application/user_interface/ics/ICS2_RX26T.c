@@ -52,17 +52,33 @@
 
 #define UART_MAX_SCOPE_CHANNELS         (12U)
 #define UART_MAX_SCOPE_RECORD_LENGTH    (256U)
+#define UART_SCOPE_DYNAMIC_ENTRY_SIZE   (6U)  /* slot(1)+type(1)+addr(4) */
+
+/*
+ * Allow raw global-variable access without a fixed whitelist.
+ * RX26T project map currently places RAM globals in 0x00000000-0x0000FFFF.
+ * Keep the range configurable to avoid accidental access to invalid regions.
+ */
+#define UART_RAM_REGION0_START          (0x00000000UL)
+#define UART_RAM_REGION0_END            (0x00010000UL) /* exclusive */
+#define UART_RAM_REGION1_START          (0x00120040UL)
+#define UART_RAM_REGION1_END            (0x001200B0UL) /* exclusive */
 
 #define UART_SCI6_PFS_TX                (0x28U)
 #define UART_SCI6_PFS_RX                (0x2AU)
 
 typedef struct
 {
-    const char * name;
-    void       * addr;
+    uint8_t      slot;
     uint8_t      type;
-    uint8_t      writable;
-} st_uart_scope_var_t;
+    uint32_t     addr;
+} st_uart_scope_channel_t;
+
+typedef struct
+{
+    uint32_t     addr;
+    uint8_t      type;
+} st_uart_var_ref_t;
 
 typedef struct
 {
@@ -70,7 +86,7 @@ typedef struct
     uint8_t  frame_ready;
     uint8_t  send_channel_cursor;
     uint8_t  channel_count;
-    uint8_t  channels[UART_MAX_SCOPE_CHANNELS];
+    st_uart_scope_channel_t channels[UART_MAX_SCOPE_CHANNELS];
     uint16_t record_length;
     uint16_t sample_count;
     float    sample_period;
@@ -104,9 +120,11 @@ static uint8_t rx_peek(uint16_t offset);
 static void rx_drop(uint16_t count);
 
 static uint8_t var_type_size(uint8_t type);
-static uint8_t var_read_value(const st_uart_scope_var_t * p_var, uint8_t * out_data);
-static uint8_t var_write_value(const st_uart_scope_var_t * p_var, uint8_t type, const uint8_t * in_data, uint16_t len);
-static const st_uart_scope_var_t * find_var_by_address(uint32_t addr);
+static uint8_t var_region_contains(uint32_t addr, uint8_t size, uint32_t start, uint32_t end);
+static uint8_t var_address_is_valid(uint32_t addr, uint8_t size);
+static uint8_t var_read_value(st_uart_var_ref_t var_ref, uint8_t * out_data);
+static uint8_t var_write_value(st_uart_var_ref_t var_ref, const uint8_t * in_data, uint16_t len);
+static float var_read_as_float(st_uart_var_ref_t var_ref, uint8_t * ok);
 
 static uint8_t protocol_send_packet(uint8_t command, const uint8_t * payload, uint16_t len);
 static void protocol_send_ack(void);
@@ -124,61 +142,10 @@ static void protocol_handle_set_channels(const uint8_t * payload, uint16_t len);
 static void protocol_handle_set_sampling(const uint8_t * payload, uint16_t len);
 
 static void scope_reset(void);
-static float scope_read_channel_value(uint8_t channel_index);
+static float scope_read_channel_value(const st_uart_scope_channel_t * p_channel, uint8_t * ok);
 static void scope_sample_once(void);
 static void scope_try_send_frame(void);
-static uint8_t scope_build_waveform_payload(uint8_t channel_index, uint8_t * out_payload, uint16_t * out_len);
-
-static const st_uart_scope_var_t s_scope_vars[] =
-{
-    {"com_u1_system_mode",                 &com_u1_system_mode,                                UART_VAR_UINT8,   1U},
-    {"g_u1_system_mode",                   &g_u1_system_mode,                                  UART_VAR_UINT8,   0U},
-    {"com_u1_ctrl_loop_mode",              &com_u1_ctrl_loop_mode,                             UART_VAR_UINT8,   1U},
-    {"com_u1_sw_userif",                   &com_u1_sw_userif,                                  UART_VAR_UINT8,   1U},
-    {"com_u2_offset_calc_time",            &com_u2_offset_calc_time,                           UART_VAR_UINT16,  1U},
-    {"com_u2_charge_bootstrap_time",       &com_u2_charge_bootstrap_time,                      UART_VAR_UINT16,  1U},
-
-    {"com_f4_ref_speed_rpm",               &com_f4_ref_speed_rpm,                              UART_VAR_FLOAT32, 1U},
-    {"com_f4_speed_rate_limit_rpm",        &com_f4_speed_rate_limit_rpm,                       UART_VAR_FLOAT32, 1U},
-    {"com_f4_overspeed_limit_rpm",         &com_f4_overspeed_limit_rpm,                        UART_VAR_FLOAT32, 1U},
-    {"com_f4_speed_omega_hz",              &com_f4_speed_omega_hz,                             UART_VAR_FLOAT32, 1U},
-    {"com_f4_speed_zeta",                  &com_f4_speed_zeta,                                 UART_VAR_FLOAT32, 1U},
-    {"com_f4_speed_lpf_hz",                &com_f4_speed_lpf_hz,                               UART_VAR_FLOAT32, 1U},
-
-    {"com_f4_current_omega_hz",            &com_f4_current_omega_hz,                           UART_VAR_FLOAT32, 1U},
-    {"com_f4_current_zeta",                &com_f4_current_zeta,                               UART_VAR_FLOAT32, 1U},
-    {"com_f4_ol_ref_id",                   &com_f4_ol_ref_id,                                  UART_VAR_FLOAT32, 1U},
-
-    {"g_st_sensorless_vector.f4_vdc_ad",   &g_st_sensorless_vector.f4_vdc_ad,                  UART_VAR_FLOAT32, 0U},
-    {"g_st_sensorless_vector.f4_iu_ad",    &g_st_sensorless_vector.f4_iu_ad,                   UART_VAR_FLOAT32, 0U},
-    {"g_st_sensorless_vector.f4_iv_ad",    &g_st_sensorless_vector.f4_iv_ad,                   UART_VAR_FLOAT32, 0U},
-    {"g_st_sensorless_vector.f4_iw_ad",    &g_st_sensorless_vector.f4_iw_ad,                   UART_VAR_FLOAT32, 0U},
-
-    {"g_st_sensorless_vector.st_speed_output.f4_speed_rad_lpf",
-                                              &g_st_sensorless_vector.st_speed_output.f4_speed_rad_lpf, UART_VAR_FLOAT32, 0U},
-    {"g_st_sensorless_vector.st_speed_output.f4_ref_speed_rad_ctrl",
-                                              &g_st_sensorless_vector.st_speed_output.f4_ref_speed_rad_ctrl, UART_VAR_FLOAT32, 0U},
-    {"g_st_sensorless_vector.st_speed_output.f4_id_ref",
-                                              &g_st_sensorless_vector.st_speed_output.f4_id_ref,  UART_VAR_FLOAT32, 0U},
-    {"g_st_sensorless_vector.st_speed_output.f4_iq_ref",
-                                              &g_st_sensorless_vector.st_speed_output.f4_iq_ref,  UART_VAR_FLOAT32, 0U},
-
-    {"g_st_sensorless_vector.st_current_output.f4_speed_rad",
-                                              &g_st_sensorless_vector.st_current_output.f4_speed_rad, UART_VAR_FLOAT32, 0U},
-    {"g_st_sensorless_vector.st_current_output.f4_ref_id_ctrl",
-                                              &g_st_sensorless_vector.st_current_output.f4_ref_id_ctrl, UART_VAR_FLOAT32, 0U},
-    {"g_st_sensorless_vector.st_current_output.f4_ed",
-                                              &g_st_sensorless_vector.st_current_output.f4_ed,    UART_VAR_FLOAT32, 0U},
-    {"g_st_sensorless_vector.st_current_output.f4_eq",
-                                              &g_st_sensorless_vector.st_current_output.f4_eq,    UART_VAR_FLOAT32, 0U},
-    {"g_st_sensorless_vector.st_current_output.f4_phase_err_rad",
-                                              &g_st_sensorless_vector.st_current_output.f4_phase_err_rad, UART_VAR_FLOAT32, 0U},
-
-    {"g_st_sensorless_vector.st_stm.u1_status",
-                                              &g_st_sensorless_vector.st_stm.u1_status,           UART_VAR_UINT8,   0U}
-};
-
-#define UART_SCOPE_VAR_COUNT (sizeof(s_scope_vars) / sizeof(s_scope_vars[0]))
+static uint8_t scope_build_waveform_payload(uint8_t channel_order, uint8_t * out_payload, uint16_t * out_len);
 
 void ics2_init(void * addr, uint8_t port, uint8_t level, uint8_t speed, uint8_t mode)
 {
@@ -407,6 +374,7 @@ static void rx_drop(uint16_t count)
         s_rx_tail = (uint16_t)(s_rx_tail - UART_RX_BUFFER_SIZE);
     }
 }
+
 static uint8_t var_type_size(uint8_t type)
 {
     switch (type)
@@ -431,77 +399,50 @@ static uint8_t var_type_size(uint8_t type)
     }
 }
 
-static uint8_t var_read_value(const st_uart_scope_var_t * p_var, uint8_t * out_data)
+static uint8_t var_region_contains(uint32_t addr, uint8_t size, uint32_t start, uint32_t end)
 {
-    union
-    {
-        uint16_t u16;
-        int16_t  i16;
-        uint32_t u32;
-        int32_t  i32;
-        float    f32;
-        uint8_t  b[4];
-    } conv;
+    uint32_t limit;
 
-    if (p_var == 0)
+    if ((0U == size) || (addr < start))
     {
         return 0U;
     }
 
-    switch (p_var->type)
+    limit = addr + (uint32_t)size;
+    if (limit < addr)
     {
-        case UART_VAR_UINT8:
-        case UART_VAR_BOOL:
-        case UART_VAR_LOGIC:
-            out_data[0] = *((volatile uint8_t *)p_var->addr);
-            return 1U;
-
-        case UART_VAR_INT8:
-            out_data[0] = (uint8_t)(*((volatile int8_t *)p_var->addr));
-            return 1U;
-
-        case UART_VAR_UINT16:
-            conv.u16 = *((volatile uint16_t *)p_var->addr);
-            out_data[0] = conv.b[0];
-            out_data[1] = conv.b[1];
-            return 2U;
-
-        case UART_VAR_INT16:
-            conv.i16 = *((volatile int16_t *)p_var->addr);
-            out_data[0] = conv.b[0];
-            out_data[1] = conv.b[1];
-            return 2U;
-
-        case UART_VAR_UINT32:
-            conv.u32 = *((volatile uint32_t *)p_var->addr);
-            out_data[0] = conv.b[0];
-            out_data[1] = conv.b[1];
-            out_data[2] = conv.b[2];
-            out_data[3] = conv.b[3];
-            return 4U;
-
-        case UART_VAR_INT32:
-            conv.i32 = *((volatile int32_t *)p_var->addr);
-            out_data[0] = conv.b[0];
-            out_data[1] = conv.b[1];
-            out_data[2] = conv.b[2];
-            out_data[3] = conv.b[3];
-            return 4U;
-
-        case UART_VAR_FLOAT32:
-            conv.f32 = *((volatile float *)p_var->addr);
-            out_data[0] = conv.b[0];
-            out_data[1] = conv.b[1];
-            out_data[2] = conv.b[2];
-            out_data[3] = conv.b[3];
-            return 4U;
-
-        default:
-            return 0U;
+        return 0U;
     }
+
+    return (uint8_t)((limit <= end) ? 1U : 0U);
 }
 
-static uint8_t var_write_value(const st_uart_scope_var_t * p_var, uint8_t type, const uint8_t * in_data, uint16_t len)
+static uint8_t var_address_is_valid(uint32_t addr, uint8_t size)
+{
+    if ((size == 2U) && ((addr & 0x1U) != 0U))
+    {
+        return 0U;
+    }
+
+    if ((size == 4U) && ((addr & 0x3U) != 0U))
+    {
+        return 0U;
+    }
+
+    if (0U != var_region_contains(addr, size, UART_RAM_REGION0_START, UART_RAM_REGION0_END))
+    {
+        return 1U;
+    }
+
+    if (0U != var_region_contains(addr, size, UART_RAM_REGION1_START, UART_RAM_REGION1_END))
+    {
+        return 1U;
+    }
+
+    return 0U;
+}
+
+static uint8_t var_read_value(st_uart_var_ref_t var_ref, uint8_t * out_data)
 {
     union
     {
@@ -514,44 +455,116 @@ static uint8_t var_write_value(const st_uart_scope_var_t * p_var, uint8_t type, 
     } conv;
     uint8_t size;
 
-    if ((p_var == 0) || (0U == p_var->writable))
+    if (out_data == 0)
     {
         return 0U;
     }
 
-    if (type != p_var->type)
+    size = var_type_size(var_ref.type);
+    if ((0U == size) || (0U == var_address_is_valid(var_ref.addr, size)))
     {
         return 0U;
     }
 
-    size = var_type_size(type);
-    if (len < size)
-    {
-        return 0U;
-    }
-
-    switch (type)
+    switch (var_ref.type)
     {
         case UART_VAR_UINT8:
         case UART_VAR_BOOL:
         case UART_VAR_LOGIC:
-            *((volatile uint8_t *)p_var->addr) = in_data[0];
+            out_data[0] = *((volatile uint8_t *)(unsigned long)var_ref.addr);
             return 1U;
 
         case UART_VAR_INT8:
-            *((volatile int8_t *)p_var->addr) = (int8_t)in_data[0];
+            out_data[0] = (uint8_t)(*((volatile int8_t *)(unsigned long)var_ref.addr));
+            return 1U;
+
+        case UART_VAR_UINT16:
+            conv.u16 = *((volatile uint16_t *)(unsigned long)var_ref.addr);
+            out_data[0] = conv.b[0];
+            out_data[1] = conv.b[1];
+            return 2U;
+
+        case UART_VAR_INT16:
+            conv.i16 = *((volatile int16_t *)(unsigned long)var_ref.addr);
+            out_data[0] = conv.b[0];
+            out_data[1] = conv.b[1];
+            return 2U;
+
+        case UART_VAR_UINT32:
+            conv.u32 = *((volatile uint32_t *)(unsigned long)var_ref.addr);
+            out_data[0] = conv.b[0];
+            out_data[1] = conv.b[1];
+            out_data[2] = conv.b[2];
+            out_data[3] = conv.b[3];
+            return 4U;
+
+        case UART_VAR_INT32:
+            conv.i32 = *((volatile int32_t *)(unsigned long)var_ref.addr);
+            out_data[0] = conv.b[0];
+            out_data[1] = conv.b[1];
+            out_data[2] = conv.b[2];
+            out_data[3] = conv.b[3];
+            return 4U;
+
+        case UART_VAR_FLOAT32:
+            conv.f32 = *((volatile float *)(unsigned long)var_ref.addr);
+            out_data[0] = conv.b[0];
+            out_data[1] = conv.b[1];
+            out_data[2] = conv.b[2];
+            out_data[3] = conv.b[3];
+            return 4U;
+
+        default:
+            return 0U;
+    }
+}
+
+static uint8_t var_write_value(st_uart_var_ref_t var_ref, const uint8_t * in_data, uint16_t len)
+{
+    union
+    {
+        uint16_t u16;
+        int16_t  i16;
+        uint32_t u32;
+        int32_t  i32;
+        float    f32;
+        uint8_t  b[4];
+    } conv;
+    uint8_t size;
+
+    if (in_data == 0)
+    {
+        return 0U;
+    }
+
+    size = var_type_size(var_ref.type);
+    if ((0U == size) || (len < size) || (0U == var_address_is_valid(var_ref.addr, size)))
+    {
+        return 0U;
+    }
+
+    switch (var_ref.type)
+    {
+        case UART_VAR_UINT8:
+        case UART_VAR_BOOL:
+        case UART_VAR_LOGIC:
+            *((volatile uint8_t *)(unsigned long)var_ref.addr) = in_data[0];
+            return 1U;
+
+        case UART_VAR_INT8:
+            *((volatile int8_t *)(unsigned long)var_ref.addr) = (int8_t)in_data[0];
             return 1U;
 
         case UART_VAR_UINT16:
             conv.b[0] = in_data[0];
             conv.b[1] = in_data[1];
-            *((volatile uint16_t *)p_var->addr) = conv.u16;
+            *((volatile uint16_t *)(unsigned long)var_ref.addr) = conv.u16;
             return 1U;
 
         case UART_VAR_INT16:
             conv.b[0] = in_data[0];
             conv.b[1] = in_data[1];
-            *((volatile int16_t *)p_var->addr) = conv.i16;
+            *((volatile int16_t *)(unsigned long)var_ref.addr) = conv.i16;
             return 1U;
 
         case UART_VAR_UINT32:
@@ -559,7 +572,7 @@ static uint8_t var_write_value(const st_uart_scope_var_t * p_var, uint8_t type, 
             conv.b[1] = in_data[1];
             conv.b[2] = in_data[2];
             conv.b[3] = in_data[3];
-            *((volatile uint32_t *)p_var->addr) = conv.u32;
+            *((volatile uint32_t *)(unsigned long)var_ref.addr) = conv.u32;
             return 1U;
 
         case UART_VAR_INT32:
@@ -567,7 +580,7 @@ static uint8_t var_write_value(const st_uart_scope_var_t * p_var, uint8_t type, 
             conv.b[1] = in_data[1];
             conv.b[2] = in_data[2];
             conv.b[3] = in_data[3];
-            *((volatile int32_t *)p_var->addr) = conv.i32;
+            *((volatile int32_t *)(unsigned long)var_ref.addr) = conv.i32;
             return 1U;
 
         case UART_VAR_FLOAT32:
@@ -575,7 +588,7 @@ static uint8_t var_write_value(const st_uart_scope_var_t * p_var, uint8_t type, 
             conv.b[1] = in_data[1];
             conv.b[2] = in_data[2];
             conv.b[3] = in_data[3];
-            *((volatile float *)p_var->addr) = conv.f32;
+            *((volatile float *)(unsigned long)var_ref.addr) = conv.f32;
             return 1U;
 
         default:
@@ -583,19 +596,85 @@ static uint8_t var_write_value(const st_uart_scope_var_t * p_var, uint8_t type, 
     }
 }
 
-static const st_uart_scope_var_t * find_var_by_address(uint32_t addr)
+static float var_read_as_float(st_uart_var_ref_t var_ref, uint8_t * ok)
 {
-    uint16_t i;
-
-    for (i = 0U; i < (uint16_t)UART_SCOPE_VAR_COUNT; i++)
+    union
     {
-        if ((uint32_t)(unsigned long)(s_scope_vars[i].addr) == addr)
+        uint16_t u16;
+        int16_t  i16;
+        uint32_t u32;
+        int32_t  i32;
+        float    f32;
+        uint8_t  b[4];
+    } conv;
+    uint8_t raw[4];
+    uint8_t len;
+
+    len = var_read_value(var_ref, raw);
+    if (0U == len)
+    {
+        if (ok != 0)
         {
-            return &s_scope_vars[i];
+            *ok = 0U;
         }
+        return 0.0f;
     }
 
-    return 0;
+    if (ok != 0)
+    {
+        *ok = 1U;
+    }
+
+    switch (var_ref.type)
+    {
+        case UART_VAR_UINT8:
+            return (float)raw[0];
+
+        case UART_VAR_INT8:
+            return (float)((int8_t)raw[0]);
+
+        case UART_VAR_UINT16:
+            conv.b[0] = raw[0];
+            conv.b[1] = raw[1];
+            return (float)conv.u16;
+
+        case UART_VAR_INT16:
+            conv.b[0] = raw[0];
+            conv.b[1] = raw[1];
+            return (float)conv.i16;
+
+        case UART_VAR_UINT32:
+            conv.b[0] = raw[0];
+            conv.b[1] = raw[1];
+            conv.b[2] = raw[2];
+            conv.b[3] = raw[3];
+            return (float)conv.u32;
+
+        case UART_VAR_INT32:
+            conv.b[0] = raw[0];
+            conv.b[1] = raw[1];
+            conv.b[2] = raw[2];
+            conv.b[3] = raw[3];
+            return (float)conv.i32;
+
+        case UART_VAR_FLOAT32:
+            conv.b[0] = raw[0];
+            conv.b[1] = raw[1];
+            conv.b[2] = raw[2];
+            conv.b[3] = raw[3];
+            return conv.f32;
+
+        case UART_VAR_BOOL:
+        case UART_VAR_LOGIC:
+            return (raw[0] != 0U) ? 1.0f : 0.0f;
+
+        default:
+            if (ok != 0)
+            {
+                *ok = 0U;
+            }
+            return 0.0f;
+    }
 }
 
 static uint8_t protocol_send_packet(uint8_t command, const uint8_t * payload, uint16_t len)
@@ -818,20 +897,21 @@ static void protocol_handle_read_variable(const uint8_t * payload, uint16_t len)
     uint8_t name_len;
     uint16_t offset;
     uint32_t addr;
-    const st_uart_scope_var_t * p_var;
+    uint8_t type;
+    st_uart_var_ref_t var_ref;
     uint8_t payload_out[96];
     uint8_t value_bytes[4];
     uint8_t value_len;
     uint16_t i;
 
-    if (len < 5U)
+    if (len < 6U)
     {
         protocol_send_nack();
         return;
     }
 
     name_len = payload[0];
-    if (len < (uint16_t)(1U + name_len + 4U))
+    if (len < (uint16_t)(1U + name_len + 5U))
     {
         protocol_send_nack();
         return;
@@ -842,15 +922,12 @@ static void protocol_handle_read_variable(const uint8_t * payload, uint16_t len)
     addr |= ((uint32_t)payload[(uint16_t)(offset + 1U)] << 8U);
     addr |= ((uint32_t)payload[(uint16_t)(offset + 2U)] << 16U);
     addr |= ((uint32_t)payload[(uint16_t)(offset + 3U)] << 24U);
+    type = payload[(uint16_t)(offset + 4U)];
 
-    p_var = find_var_by_address(addr);
-    if (p_var == 0)
-    {
-        protocol_send_nack();
-        return;
-    }
+    var_ref.addr = addr;
+    var_ref.type = type;
 
-    value_len = var_read_value(p_var, value_bytes);
+    value_len = var_read_value(var_ref, value_bytes);
     if (0U == value_len)
     {
         protocol_send_nack();
@@ -869,7 +946,7 @@ static void protocol_handle_read_variable(const uint8_t * payload, uint16_t len)
         payload_out[(uint16_t)(1U + i)] = payload[(uint16_t)(1U + i)];
     }
 
-    payload_out[(uint16_t)(1U + name_len)] = p_var->type;
+    payload_out[(uint16_t)(1U + name_len)] = type;
     for (i = 0U; i < value_len; i++)
     {
         payload_out[(uint16_t)(2U + name_len + i)] = value_bytes[i];
@@ -884,7 +961,7 @@ static void protocol_handle_write_variable(const uint8_t * payload, uint16_t len
     uint16_t offset;
     uint32_t addr;
     uint8_t type;
-    const st_uart_scope_var_t * p_var;
+    st_uart_var_ref_t var_ref;
 
     if (len < 7U)
     {
@@ -906,14 +983,10 @@ static void protocol_handle_write_variable(const uint8_t * payload, uint16_t len
     addr |= ((uint32_t)payload[(uint16_t)(offset + 3U)] << 24U);
     type = payload[(uint16_t)(offset + 4U)];
 
-    p_var = find_var_by_address(addr);
-    if (p_var == 0)
-    {
-        protocol_send_nack();
-        return;
-    }
+    var_ref.addr = addr;
+    var_ref.type = type;
 
-    if (0U == var_write_value(p_var, type, &payload[(uint16_t)(offset + 5U)], (uint16_t)(len - offset - 5U)))
+    if (0U == var_write_value(var_ref, &payload[(uint16_t)(offset + 5U)], (uint16_t)(len - offset - 5U)))
     {
         protocol_send_nack();
         return;
@@ -930,8 +1003,10 @@ static void protocol_handle_start_scope(const uint8_t * payload, uint16_t len)
         uint8_t b[4];
     } conv;
     int32_t record_len;
+    uint8_t channel_count_raw;
     uint8_t channel_count;
     uint8_t i;
+    uint16_t offset;
     uint8_t valid_count = 0U;
 
     if (len < 9U)
@@ -950,8 +1025,8 @@ static void protocol_handle_start_scope(const uint8_t * payload, uint16_t len)
     record_len |= ((int32_t)payload[6] << 16);
     record_len |= ((int32_t)payload[7] << 24);
 
-    channel_count = payload[8];
-    if (len < (uint16_t)(9U + channel_count))
+    channel_count_raw = payload[8];
+    if (len < (uint16_t)(9U + ((uint16_t)channel_count_raw * UART_SCOPE_DYNAMIC_ENTRY_SIZE)))
     {
         protocol_send_nack();
         return;
@@ -969,17 +1044,31 @@ static void protocol_handle_start_scope(const uint8_t * payload, uint16_t len)
     s_scope.sample_period = conv.f32;
     s_scope.record_length = (uint16_t)record_len;
 
+    channel_count = channel_count_raw;
     if (channel_count > UART_MAX_SCOPE_CHANNELS)
     {
         channel_count = UART_MAX_SCOPE_CHANNELS;
     }
 
+    offset = 9U;
     for (i = 0U; i < channel_count; i++)
     {
-        uint8_t ch = payload[(uint16_t)(9U + i)];
-        if (ch < UART_MAX_SCOPE_CHANNELS)
+        st_uart_scope_channel_t channel;
+        uint8_t size;
+
+        channel.slot = payload[offset];
+        channel.type = payload[(uint16_t)(offset + 1U)];
+        channel.addr = (uint32_t)payload[(uint16_t)(offset + 2U)];
+        channel.addr |= ((uint32_t)payload[(uint16_t)(offset + 3U)] << 8U);
+        channel.addr |= ((uint32_t)payload[(uint16_t)(offset + 4U)] << 16U);
+        channel.addr |= ((uint32_t)payload[(uint16_t)(offset + 5U)] << 24U);
+        offset = (uint16_t)(offset + UART_SCOPE_DYNAMIC_ENTRY_SIZE);
+
+        size = var_type_size(channel.type);
+        if ((channel.slot < UART_MAX_SCOPE_CHANNELS) && (0U != size) &&
+            (0U != var_address_is_valid(channel.addr, size)))
         {
-            s_scope.channels[valid_count] = ch;
+            s_scope.channels[valid_count] = channel;
             valid_count++;
         }
     }
@@ -1044,8 +1133,10 @@ static void protocol_handle_set_trigger(const uint8_t * payload, uint16_t len)
 
 static void protocol_handle_set_channels(const uint8_t * payload, uint16_t len)
 {
+    uint8_t count_raw;
     uint8_t count;
     uint8_t i;
+    uint16_t offset;
     uint8_t valid_count = 0U;
 
     if (len < 1U)
@@ -1054,32 +1145,52 @@ static void protocol_handle_set_channels(const uint8_t * payload, uint16_t len)
         return;
     }
 
-    count = payload[0];
-    if (len < (uint16_t)(1U + count))
+    count_raw = payload[0];
+    if (len < (uint16_t)(1U + ((uint16_t)count_raw * UART_SCOPE_DYNAMIC_ENTRY_SIZE)))
     {
         protocol_send_nack();
         return;
     }
 
+    count = count_raw;
     if (count > UART_MAX_SCOPE_CHANNELS)
     {
         count = UART_MAX_SCOPE_CHANNELS;
     }
 
+    offset = 1U;
     for (i = 0U; i < count; i++)
     {
-        uint8_t ch = payload[(uint16_t)(1U + i)];
-        if (ch < UART_MAX_SCOPE_CHANNELS)
+        st_uart_scope_channel_t channel;
+        uint8_t size;
+
+        channel.slot = payload[offset];
+        channel.type = payload[(uint16_t)(offset + 1U)];
+        channel.addr = (uint32_t)payload[(uint16_t)(offset + 2U)];
+        channel.addr |= ((uint32_t)payload[(uint16_t)(offset + 3U)] << 8U);
+        channel.addr |= ((uint32_t)payload[(uint16_t)(offset + 4U)] << 16U);
+        channel.addr |= ((uint32_t)payload[(uint16_t)(offset + 5U)] << 24U);
+        offset = (uint16_t)(offset + UART_SCOPE_DYNAMIC_ENTRY_SIZE);
+
+        size = var_type_size(channel.type);
+        if ((channel.slot < UART_MAX_SCOPE_CHANNELS) && (0U != size) &&
+            (0U != var_address_is_valid(channel.addr, size)))
         {
-            s_scope.channels[valid_count] = ch;
+            s_scope.channels[valid_count] = channel;
             valid_count++;
         }
     }
 
-    if (valid_count > 0U)
+    if (0U == valid_count)
     {
-        s_scope.channel_count = valid_count;
+        protocol_send_nack();
+        return;
     }
+
+    s_scope.channel_count = valid_count;
+    s_scope.sample_count = 0U;
+    s_scope.frame_ready = 0U;
+    s_scope.send_channel_cursor = 0U;
 
     protocol_send_ack();
 }
@@ -1124,63 +1235,29 @@ static void protocol_handle_set_sampling(const uint8_t * payload, uint16_t len)
 
 static void scope_reset(void)
 {
-    uint16_t i;
-
     memset(&s_scope, 0, sizeof(s_scope));
 
     s_scope.sample_period = 0.0001f;
     s_scope.record_length = 100U;
-    s_scope.channel_count = UART_MAX_SCOPE_CHANNELS;
-
-    for (i = 0U; i < UART_MAX_SCOPE_CHANNELS; i++)
-    {
-        s_scope.channels[i] = (uint8_t)i;
-    }
+    s_scope.channel_count = 0U;
 }
 
-static float scope_read_channel_value(uint8_t channel_index)
+static float scope_read_channel_value(const st_uart_scope_channel_t * p_channel, uint8_t * ok)
 {
-    switch (channel_index)
+    st_uart_var_ref_t var_ref;
+
+    if (p_channel == 0)
     {
-        case 0U:
-            return g_st_sensorless_vector.st_speed_output.f4_speed_rad_lpf * MTR_RAD2RPM;
-
-        case 1U:
-            return com_f4_ref_speed_rpm;
-
-        case 2U:
-            return g_st_sensorless_vector.st_speed_output.f4_iq_ref;
-
-        case 3U:
-            return g_st_sensorless_vector.st_speed_output.f4_id_ref;
-
-        case 4U:
-            return g_st_sensorless_vector.f4_iu_ad;
-
-        case 5U:
-            return g_st_sensorless_vector.f4_iv_ad;
-
-        case 6U:
-            return g_st_sensorless_vector.f4_iw_ad;
-
-        case 7U:
-            return g_st_sensorless_vector.f4_vdc_ad;
-
-        case 8U:
-            return g_st_sensorless_vector.st_current_output.f4_phase_err_rad * MTR_RAD2DEG;
-
-        case 9U:
-            return g_st_sensorless_vector.st_current_output.f4_ed;
-
-        case 10U:
-            return g_st_sensorless_vector.st_current_output.f4_eq;
-
-        case 11U:
-            return (float)g_st_sensorless_vector.st_stm.u1_status;
-
-        default:
-            return 0.0f;
+        if (ok != 0)
+        {
+            *ok = 0U;
+        }
+        return 0.0f;
     }
+
+    var_ref.addr = p_channel->addr;
+    var_ref.type = p_channel->type;
+    return var_read_as_float(var_ref, ok);
 }
 
 static void scope_sample_once(void)
@@ -1196,8 +1273,12 @@ static void scope_sample_once(void)
 
     for (i = 0U; i < s_scope.channel_count; i++)
     {
-        uint8_t ch = s_scope.channels[i];
-        s_scope.buffer[ch][s_scope.sample_count] = scope_read_channel_value(ch);
+        uint8_t valid;
+        s_scope.buffer[i][s_scope.sample_count] = scope_read_channel_value(&s_scope.channels[i], &valid);
+        if (0U == valid)
+        {
+            s_scope.buffer[i][s_scope.sample_count] = 0.0f;
+        }
     }
 
     s_scope.sample_count++;
@@ -1211,7 +1292,7 @@ static void scope_sample_once(void)
 
 static void scope_try_send_frame(void)
 {
-    uint8_t ch;
+    uint8_t channel_order;
     uint16_t payload_len;
 
     if (0U == s_scope.frame_ready)
@@ -1227,9 +1308,9 @@ static void scope_try_send_frame(void)
         return;
     }
 
-    ch = s_scope.channels[s_scope.send_channel_cursor];
+    channel_order = s_scope.send_channel_cursor;
 
-    if (0U == scope_build_waveform_payload(ch, s_payload_buffer, &payload_len))
+    if (0U == scope_build_waveform_payload(channel_order, s_payload_buffer, &payload_len))
     {
         return;
     }
@@ -1240,7 +1321,7 @@ static void scope_try_send_frame(void)
     }
 }
 
-static uint8_t scope_build_waveform_payload(uint8_t channel_index, uint8_t * out_payload, uint16_t * out_len)
+static uint8_t scope_build_waveform_payload(uint8_t channel_order, uint8_t * out_payload, uint16_t * out_len)
 {
     union
     {
@@ -1250,13 +1331,13 @@ static uint8_t scope_build_waveform_payload(uint8_t channel_index, uint8_t * out
     uint16_t idx;
     uint16_t i;
 
-    if ((out_payload == 0) || (out_len == 0) || (channel_index >= UART_MAX_SCOPE_CHANNELS))
+    if ((out_payload == 0) || (out_len == 0) || (channel_order >= s_scope.channel_count))
     {
         return 0U;
     }
 
     idx = 0U;
-    out_payload[idx++] = channel_index;
+    out_payload[idx++] = s_scope.channels[channel_order].slot;
 
     conv.f32 = s_scope.sample_period;
     out_payload[idx++] = conv.b[0];
@@ -1269,7 +1350,7 @@ static uint8_t scope_build_waveform_payload(uint8_t channel_index, uint8_t * out
 
     for (i = 0U; i < s_scope.record_length; i++)
     {
-        conv.f32 = s_scope.buffer[channel_index][i];
+        conv.f32 = s_scope.buffer[channel_order][i];
         out_payload[idx++] = conv.b[0];
         out_payload[idx++] = conv.b[1];
         out_payload[idx++] = conv.b[2];

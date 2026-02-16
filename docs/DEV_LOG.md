@@ -1,6 +1,31 @@
 # DEV_LOG.md
 
 ## 2026-02-16
+Summary: Implemented unrestricted (address-based) global variable read/write and dynamic scope variable binding from GUI to MCU.
+Files: Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/src/application/user_interface/ics/ICS2_RX26T.c, src/MCUScope/Services/IcsProtocolService.cs, src/MCUScope/ViewModels/MainViewModel.cs, tools/uart_smoke.py, tools/run_regression.py, docs/UART_PROTOCOL.md, docs/USAGE.md, docs/TESTING.md, docs/GUI_OPERATION_MANUAL_CN.md, docs/MCU_CODE_AND_MOTOR_DEBUG_GUIDE.md, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- MCU side (`ICS2_RX26T.c`):
+  - Removed fixed variable whitelist dependency and switched read/write to direct `address + type` access.
+  - Added configurable RAM-region validation guards before dereferencing pointers, preventing invalid-range access by protocol requests.
+  - Updated scope engine to accept per-channel descriptors (`slot + type + address`) in `StartScope`/`SetChannels` payloads.
+  - Removed fixed M1..M12 hardcoded signal mapping; sampling now reads selected variables dynamically.
+- PC GUI side:
+  - `IcsProtocolService.RequestReadVariable` now sends variable type along with address.
+  - Added alias/display-name variable resolution path for watch/scope operations.
+  - `StartScope` now sends dynamic channel descriptors for each visible channel.
+  - `MainViewModel.RunScope` now resolves selected channel variables to address/type and blocks run if no valid channel is configured.
+  - Watch readback update now supports alias/display-name rows.
+- Tooling/docs:
+  - `tools/uart_smoke.py` updated to new packet format (`--read-var NAME:ADDR[:TYPE]`, `--scope-var SLOT:ADDR:TYPE`).
+  - `tools/run_regression.py` passes through `--scope-var`.
+  - Protocol/usage/testing/manual/debug docs updated to reflect "no whitelist + dynamic scope binding" behavior.
+Tests:
+- `dotnet build MCUScope.sln` executed; passed with `0 warning` and `0 error`.
+- `python -m py_compile tools/uart_smoke.py tools/run_regression.py` executed; passed.
+- `python tools/uart_smoke.py --dry-run --scope --scope-var 0:0x00001829:u8 --scope-var 1:0x00007650:f32 --read-var com_u1_system_mode:0x00001829:u8` executed; passed.
+- `python tools/run_regression.py --skip-dotnet-build --no-map` executed; passed.
+
+## 2026-02-16
 Summary: Added a complete Chinese GUI operation manual aligned to current MCU UART implementation and documented a prioritized GUI improvement backlog.
 Files: docs/GUI_OPERATION_MANUAL_CN.md, docs/USAGE.md, docs/CHANGELOG.md, docs/DEV_LOG.md.
 Behavior:

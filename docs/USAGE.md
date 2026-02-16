@@ -29,8 +29,8 @@ The closed `ICS2_RX26T.lib` path is replaced by a C implementation:
 3. Click read/write controls.
 
 Notes:
-- Firmware enforces a whitelist. Only allowed addresses can be read/written.
-- Type must match whitelist type for write operations.
+- Firmware now supports direct variable access by address/type (no fixed whitelist table).
+- For safety, MCU validates requested address range against configured RAM regions before read/write.
 
 ## Scope Capture
 
@@ -40,6 +40,7 @@ Notes:
 
 Firmware side behavior:
 - Sampling runs in `ics2_watchpoint()` path (called from control interrupt).
+- GUI-selected variables are sent to MCU as dynamic scope entries (`slot + type + address`).
 - Completed records are sent channel-by-channel using `WaveformData (0x84)` packets.
 
 ## MCU Reference Project Integration
@@ -57,7 +58,8 @@ Current default UART config in firmware:
 
 ## Known Limits (Current Stage)
 
-- Scope channel data source is fixed to 12 predefined runtime signals in `ICS2_RX26T.c`.
+- Scope still has up to 12 GUI slots, but each slot can now bind any variable loaded from map/sym/csv/xml.
+- Trigger parameters are accepted and stored, but trigger decision logic is not yet fully implemented.
 - The open C replacements focus on deterministic and maintainable behavior first; control tuning may need retuning on real hardware.
 
 ## Automation Tools
@@ -71,19 +73,19 @@ Use these scripts from repository root to speed up regression checks.
 `python tools/check_mcu_artifacts.py --map Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/HardwareDebug/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.map`
 
 3. Dry-run UART packet generation (no hardware required):
-`python tools/uart_smoke.py --dry-run --scope --scope-channels 0,1`
+`python tools/uart_smoke.py --dry-run --scope --scope-var 0:0x00001829:u8 --scope-var 1:0x00007650:f32`
 
 4. Execute live UART smoke test with target board:
-`python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-channels 0,1`
+`python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-var 0:0x00001829:u8 --scope-var 1:0x00007650:f32`
 
 5. Optional variable read/write in smoke test:
-`python tools/uart_smoke.py --port COM5 --read-var com_u1_system_mode:0x00001829 --write-var com_u1_system_mode:0x00001829:u8:1`
+`python tools/uart_smoke.py --port COM5 --read-var com_u1_system_mode:0x00001829:u8 --write-var com_u1_system_mode:0x00001829:u8:1`
 
 6. Run one-click regression with automatic log:
 `python tools/run_regression.py`
 
 7. Save UART smoke output into a file:
-`python tools/uart_smoke.py --dry-run --scope --scope-channels 0,1 --log-file logs/uart_smoke_latest.log`
+`python tools/uart_smoke.py --dry-run --scope --scope-var 0:0x00001829:u8 --scope-var 1:0x00007650:f32 --log-file logs/uart_smoke_latest.log`
 
 8. Check and delete obsolete closed `.lib` files replaced by source code:
 `python tools/cleanup_legacy_libs.py`

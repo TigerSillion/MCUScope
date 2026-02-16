@@ -25,13 +25,13 @@ Run from repository root:
 `python tools/check_mcu_artifacts.py --map Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/HardwareDebug/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.map`
 
 3. UART smoke dry-run (packet build and parser path check):
-`python tools/uart_smoke.py --dry-run --scope --scope-channels 0,1`
+`python tools/uart_smoke.py --dry-run --scope --scope-var 0:0x00001829:u8 --scope-var 1:0x00007650:f32`
 
 4. UART smoke on hardware (`pyserial` required):
-`python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-channels 0,1`
+`python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-var 0:0x00001829:u8 --scope-var 1:0x00007650:f32`
 
 5. UART variable read/write smoke on hardware:
-`python tools/uart_smoke.py --port COM5 --read-var com_u1_system_mode:0x00001829 --write-var com_u1_system_mode:0x00001829:u8:1`
+`python tools/uart_smoke.py --port COM5 --read-var com_u1_system_mode:0x00001829:u8 --write-var com_u1_system_mode:0x00001829:u8:1`
 
 6. One-click batch regression (artifacts + UART smoke + dotnet build):
 `python tools/run_regression.py`
@@ -40,7 +40,7 @@ Run from repository root:
 `python tools/run_regression.py --fail-on-stale-map --map Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/HardwareDebug/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100.map`
 
 8. Persist UART smoke output in custom file:
-`python tools/uart_smoke.py --dry-run --scope --scope-channels 0,1 --log-file logs/uart_smoke_latest.log`
+`python tools/uart_smoke.py --dry-run --scope --scope-var 0:0x00001829:u8 --scope-var 1:0x00007650:f32 --log-file logs/uart_smoke_latest.log`
 
 9. Verify and clean obsolete closed libs after source replacement:
 `python tools/cleanup_legacy_libs.py`

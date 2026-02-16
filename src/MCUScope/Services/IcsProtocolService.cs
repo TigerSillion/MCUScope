@@ -2,8 +2,6 @@ using MCUScope.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace MCUScope.Services
 {
@@ -38,6 +36,13 @@ namespace MCUScope.Services
     {
         public string VariableName { get; set; } = string.Empty;
         public double Value { get; set; }
+    }
+
+    public class ScopeChannelRequest
+    {
+        public int ChannelIndex { get; set; }
+        public uint Address { get; set; }
+        public VariableType Type { get; set; }
     }
 
     public class IcsProtocolService : IDisposable
@@ -146,18 +151,21 @@ namespace MCUScope.Services
 
         private void HandleVariableData(byte[] payload)
         {
-            if (payload.Length < 5) return;
+            if (payload.Length < 3) return;
             // Format: [nameLen(1)][name(n)][type(1)][value(4)]
             try
             {
                 int offset = 0;
                 int nameLen = payload[offset++];
+                if (payload.Length < 2 + nameLen) return;
                 string name = System.Text.Encoding.ASCII.GetString(payload, offset, nameLen);
                 offset += nameLen;
                 byte type = payload[offset++];
+                int valueSize = GetTypeByteSize((VariableType)type);
+                if (payload.Length < offset + valueSize) return;
                 double value = DecodeValue(payload, offset, (VariableType)type);
 
-                var variable = Variables.FirstOrDefault(v => v.Name == name);
+                var variable = FindVariableByAnyName(name);
                 if (variable != null)
                     value *= variable.Scale;
 
@@ -234,29 +242,52 @@ namespace MCUScope.Services
             };
         }
 
+        private static int GetTypeByteSize(VariableType type)
+        {
+            return type switch
+            {
+                VariableType.UInt8 or VariableType.Int8 or VariableType.Bool or VariableType.Logic => 1,
+                VariableType.UInt16 or VariableType.Int16 => 2,
+                VariableType.UInt32 or VariableType.Int32 or VariableType.Float32 => 4,
+                _ => 4
+            };
+        }
+
+        private VariableInfo? FindVariableByAnyName(string variableName)
+        {
+            return Variables.FirstOrDefault(v =>
+                string.Equals(v.Name, variableName, StringComparison.Ordinal) ||
+                string.Equals(v.DisplayName, variableName, StringComparison.Ordinal));
+        }
+
+        public bool TryResolveVariable(string variableName, out VariableInfo variable)
+        {
+            variable = FindVariableByAnyName(variableName) ?? new VariableInfo();
+            return !string.IsNullOrEmpty(variable.Name);
+        }
+
         public void RequestReadVariable(string variableName)
         {
-            var variable = Variables.FirstOrDefault(v => v.Name == variableName);
-            if (variable == null) return;
+            if (!TryResolveVariable(variableName, out var variable)) return;
 
-            var nameBytes = System.Text.Encoding.ASCII.GetBytes(variableName);
-            var payload = new byte[5 + nameBytes.Length];
+            var nameBytes = System.Text.Encoding.ASCII.GetBytes(variable.Name);
+            var payload = new byte[6 + nameBytes.Length];
             payload[0] = (byte)nameBytes.Length;
             Array.Copy(nameBytes, 0, payload, 1, nameBytes.Length);
             // address
             int offset = 1 + nameBytes.Length;
             BitConverter.GetBytes(variable.Address).CopyTo(payload, offset);
+            payload[offset + 4] = (byte)variable.ModifiedType;
 
             _serial.SendCommand(IcsCommands.ReadVariable, payload);
         }
 
         public void RequestWriteVariable(string variableName, double value)
         {
-            var variable = Variables.FirstOrDefault(v => v.Name == variableName);
-            if (variable == null) return;
+            if (!TryResolveVariable(variableName, out var variable)) return;
 
             double rawValue = variable.Scale != 0 ? value / variable.Scale : value;
-            var nameBytes = System.Text.Encoding.ASCII.GetBytes(variableName);
+            var nameBytes = System.Text.Encoding.ASCII.GetBytes(variable.Name);
             var valueBytes = EncodeValue(rawValue, variable.ModifiedType);
 
             var payload = new byte[2 + nameBytes.Length + 4 + valueBytes.Length];
@@ -272,14 +303,25 @@ namespace MCUScope.Services
             _serial.SendCommand(IcsCommands.WriteVariable, payload);
         }
 
-        public void StartScope(double samplePeriod, int recordLength, int[] channelIndices)
+        public void StartScope(double samplePeriod, int recordLength, IReadOnlyList<ScopeChannelRequest> channels)
         {
-            var payload = new byte[9 + channelIndices.Length];
+            if (channels == null || channels.Count == 0) return;
+
+            int count = Math.Min(channels.Count, 12);
+            var payload = new byte[9 + count * 6];
             BitConverter.GetBytes((float)samplePeriod).CopyTo(payload, 0);
             BitConverter.GetBytes(recordLength).CopyTo(payload, 4);
-            payload[8] = (byte)channelIndices.Length;
-            for (int i = 0; i < channelIndices.Length; i++)
-                payload[9 + i] = (byte)channelIndices[i];
+            payload[8] = (byte)count;
+
+            int offset = 9;
+            for (int i = 0; i < count; i++)
+            {
+                var channel = channels[i];
+                payload[offset++] = (byte)Math.Clamp(channel.ChannelIndex, 0, 11);
+                payload[offset++] = (byte)channel.Type;
+                BitConverter.GetBytes(channel.Address).CopyTo(payload, offset);
+                offset += 4;
+            }
 
             _serial.SendCommand(IcsCommands.StartScope, payload);
         }

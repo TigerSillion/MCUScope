@@ -4,8 +4,8 @@
 Usage examples:
   python tools/uart_smoke.py --dry-run
   python tools/uart_smoke.py --port COM5 --baud 1000000
-  python tools/uart_smoke.py --port COM5 --read-var com_u1_system_mode:0x00001829
-  python tools/uart_smoke.py --port COM5 --scope --scope-channels 0,1,2
+  python tools/uart_smoke.py --port COM5 --read-var com_u1_system_mode:0x00001829:u8
+  python tools/uart_smoke.py --port COM5 --scope --scope-var 0:0x00001829:u8 --scope-var 1:0x00007650:f32
 """
 
 from __future__ import annotations
@@ -68,6 +68,7 @@ class ProtocolError(RuntimeError):
 class ReadVarSpec:
     name: str
     address: int
+    var_type: int
 
 
 @dataclass
@@ -76,6 +77,13 @@ class WriteVarSpec:
     address: int
     var_type: int
     value: float
+
+
+@dataclass
+class ScopeVarSpec:
+    slot: int
+    address: int
+    var_type: int
 
 
 class TeeStream:
@@ -221,10 +229,22 @@ def parse_waveform_payload(payload: bytes) -> Tuple[int, float, int]:
 
 
 def parse_read_var_spec(token: str) -> ReadVarSpec:
-    parts = token.split(":", 1)
-    if len(parts) != 2:
-        raise ValueError("read-var format must be NAME:ADDRESS")
-    return ReadVarSpec(name=parts[0], address=int(parts[1], 0))
+    parts = token.split(":")
+    if len(parts) not in (2, 3):
+        raise ValueError("read-var format must be NAME:ADDRESS[:TYPE]")
+
+    if len(parts) == 3:
+        var_type_token = parts[2].strip().lower()
+        if var_type_token.isdigit():
+            var_type = int(var_type_token)
+        else:
+            if var_type_token not in VAR_TYPE_MAP:
+                raise ValueError(f"Unknown variable type: {parts[2]}")
+            var_type = VAR_TYPE_MAP[var_type_token]
+    else:
+        var_type = VAR_TYPE_MAP["u8"]
+
+    return ReadVarSpec(name=parts[0], address=int(parts[1], 0), var_type=var_type)
 
 
 def parse_write_var_spec(token: str) -> WriteVarSpec:
@@ -244,6 +264,26 @@ def parse_write_var_spec(token: str) -> WriteVarSpec:
         address=int(parts[1], 0),
         var_type=var_type,
         value=float(parts[3]),
+    )
+
+
+def parse_scope_var_spec(token: str) -> ScopeVarSpec:
+    parts = token.split(":", 2)
+    if len(parts) != 3:
+        raise ValueError("scope-var format must be SLOT:ADDRESS:TYPE")
+
+    var_type_token = parts[2].strip().lower()
+    if var_type_token.isdigit():
+        var_type = int(var_type_token)
+    else:
+        if var_type_token not in VAR_TYPE_MAP:
+            raise ValueError(f"Unknown scope variable type: {parts[2]}")
+        var_type = VAR_TYPE_MAP[var_type_token]
+
+    return ScopeVarSpec(
+        slot=int(parts[0], 0),
+        address=int(parts[1], 0),
+        var_type=var_type,
     )
 
 
@@ -287,7 +327,7 @@ def run_dry_run(
     read_specs: Sequence[ReadVarSpec],
     write_specs: Sequence[WriteVarSpec],
     scope_enabled: bool,
-    scope_channels: Sequence[int],
+    scope_vars: Sequence[ScopeVarSpec],
     scope_sample_period: float,
     scope_record_length: int,
 ) -> int:
@@ -297,7 +337,7 @@ def run_dry_run(
 
     for spec in read_specs:
         name = spec.name.encode("ascii")
-        payload = bytes((len(name),)) + name + struct.pack("<I", spec.address)
+        payload = bytes((len(name),)) + name + struct.pack("<I", spec.address) + bytes((spec.var_type,))
         packets.append((f"ReadVariable:{spec.name}", build_packet(CMD_READ_VARIABLE, payload)))
 
     for spec in write_specs:
@@ -313,13 +353,15 @@ def run_dry_run(
         packets.append((f"WriteVariable:{spec.name}", build_packet(CMD_WRITE_VARIABLE, payload)))
 
     if scope_enabled:
-        channels = bytes(scope_channels)
+        count = min(len(scope_vars), 12)
         start_payload = (
             struct.pack("<f", scope_sample_period)
             + struct.pack("<i", scope_record_length)
-            + bytes((len(channels),))
-            + channels
+            + bytes((count,))
         )
+        for spec in scope_vars[:count]:
+            start_payload += bytes((spec.slot & 0xFF, spec.var_type & 0xFF))
+            start_payload += struct.pack("<I", spec.address)
         packets.append(("StartScope", build_packet(CMD_START_SCOPE, start_payload)))
         packets.append(("StopScope", build_packet(CMD_STOP_SCOPE, b"")))
 
@@ -363,9 +405,12 @@ def run_serial(args: argparse.Namespace) -> int:
         print(f"[PASS] InfoResponse cpu={cpu_name} lib={lib_version} clock={clock:.3f}MHz")
 
         for spec in args.read_vars:
-            print(f"[STEP] ReadVariable {spec.name} @ 0x{spec.address:08X}")
+            print(
+                f"[STEP] ReadVariable {spec.name} @ 0x{spec.address:08X} "
+                f"type={VAR_TYPE_NAME.get(spec.var_type, spec.var_type)}"
+            )
             name = spec.name.encode("ascii")
-            read_payload = bytes((len(name),)) + name + struct.pack("<I", spec.address)
+            read_payload = bytes((len(name),)) + name + struct.pack("<I", spec.address) + bytes((spec.var_type,))
             client.send(CMD_READ_VARIABLE, read_payload)
             command, payload = client.wait_for((CMD_VARIABLE_DATA, CMD_NACK), args.timeout)
             if command == CMD_NACK:
@@ -395,17 +440,19 @@ def run_serial(args: argparse.Namespace) -> int:
             print("[PASS] Write ACK received")
 
         if args.scope:
-            channels = bytes(args.scope_channels)
+            count = min(len(args.scope_vars), 12)
             print(
-                f"[STEP] StartScope channels={list(channels)} "
+                f"[STEP] StartScope channels={count} "
                 f"period={args.scope_sample_period} record={args.scope_record_length}"
             )
             start_payload = (
                 struct.pack("<f", args.scope_sample_period)
                 + struct.pack("<i", args.scope_record_length)
-                + bytes((len(channels),))
-                + channels
+                + bytes((count,))
             )
+            for spec in args.scope_vars[:count]:
+                start_payload += bytes((spec.slot & 0xFF, spec.var_type & 0xFF))
+                start_payload += struct.pack("<I", spec.address)
             client.send(CMD_START_SCOPE, start_payload)
             command, _ = client.wait_for((CMD_ACK, CMD_NACK), args.timeout)
             if command == CMD_NACK:
@@ -448,7 +495,7 @@ def parse_args() -> argparse.Namespace:
         dest="read_var_tokens",
         action="append",
         default=[],
-        help="Read variable spec: NAME:ADDRESS (hex or decimal). Repeatable.",
+        help="Read variable spec: NAME:ADDRESS[:TYPE] (hex or decimal). Repeatable.",
     )
     parser.add_argument(
         "--write-var",
@@ -461,7 +508,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--scope-channels",
         default="0",
-        help="Comma-separated scope channel indexes (default: 0).",
+        help="Legacy helper for dry-run: comma-separated channel slots (default: 0).",
+    )
+    parser.add_argument(
+        "--scope-var",
+        dest="scope_var_tokens",
+        action="append",
+        default=[],
+        help="Scope variable spec: SLOT:ADDRESS:TYPE. Repeatable. Required for live scope mode.",
     )
     parser.add_argument(
         "--scope-sample-period",
@@ -485,6 +539,7 @@ def parse_args() -> argparse.Namespace:
             for part in args.scope_channels.split(",")
             if part.strip() != ""
         ]
+        args.scope_vars = [parse_scope_var_spec(token) for token in args.scope_var_tokens]
     except Exception as exc:
         raise SystemExit(f"Argument parse error: {exc}") from exc
 
@@ -498,6 +553,19 @@ def parse_args() -> argparse.Namespace:
     if args.scope_record_length <= 0:
         raise SystemExit("--scope-record-length must be > 0.")
 
+    if args.scope and not args.scope_vars:
+        args.scope_vars = [
+            ScopeVarSpec(slot=slot, address=0, var_type=VAR_TYPE_MAP["f32"])
+            for slot in args.scope_channels
+        ]
+        if not args.dry_run:
+            raise SystemExit("Live scope mode requires --scope-var SLOT:ADDRESS:TYPE (repeatable).")
+
+    if args.scope:
+        for spec in args.scope_vars:
+            if spec.slot < 0 or spec.slot > 11:
+                raise SystemExit(f"scope slot out of range: {spec.slot}")
+
     return args
 
 
@@ -507,7 +575,7 @@ def execute_args(args: argparse.Namespace) -> int:
             read_specs=args.read_vars,
             write_specs=args.write_vars,
             scope_enabled=args.scope,
-            scope_channels=args.scope_channels,
+            scope_vars=args.scope_vars,
             scope_sample_period=args.scope_sample_period,
             scope_record_length=args.scope_record_length,
         )

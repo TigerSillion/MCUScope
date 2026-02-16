@@ -45,11 +45,12 @@ ReadVariable (0x10)
 - nameLen: 1 byte
 - name: ASCII
 - address: uint32
+- type: 1 byte, VariableType enum value
 - Response VariableData (0x83):
 - nameLen: 1 byte
 - name: ASCII
 - type: 1 byte, VariableType enum value
-- value: 4 bytes, little-endian. For 1- or 2-byte types, upper bytes are ignored by the PC.
+- value: variable-size raw bytes by type (1/2/4 bytes)
 
 WriteVariable (0x11)
 - Request:
@@ -65,7 +66,10 @@ StartScope (0x20)
 - samplePeriod: float32
 - recordLength: int32
 - channelCount: 1 byte
-- channelIndices: channelCount bytes
+- channel entries: repeated `channelCount` times
+  - slot: 1 byte (GUI channel index 0..11)
+  - type: 1 byte (VariableType enum value)
+  - address: uint32 (target variable address)
 
 StopScope (0x21)
 - Request: empty payload
@@ -77,6 +81,14 @@ SetTrigger (0x24)
 - source: 1 byte
 - mode: 1 byte
 - edge: 1 byte
+
+SetChannels (0x23)
+- Request:
+- channelCount: 1 byte
+- channel entries: repeated `channelCount` times
+  - slot: 1 byte
+  - type: 1 byte
+  - address: uint32
 
 WaveformData (0x84)
 - Response from MCU to PC:

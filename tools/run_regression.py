@@ -117,7 +117,7 @@ def parse_args() -> argparse.Namespace:
         dest="read_vars",
         action="append",
         default=[],
-        help="Optional read variable spec NAME:ADDRESS (repeatable).",
+        help="Optional read variable spec NAME:ADDRESS[:TYPE] (repeatable).",
     )
     parser.add_argument(
         "--write-var",
@@ -125,6 +125,13 @@ def parse_args() -> argparse.Namespace:
         action="append",
         default=[],
         help="Optional write variable spec NAME:ADDRESS:TYPE:VALUE (repeatable).",
+    )
+    parser.add_argument(
+        "--scope-var",
+        dest="scope_vars",
+        action="append",
+        default=[],
+        help="Optional scope variable spec SLOT:ADDRESS:TYPE (repeatable).",
     )
     parser.add_argument(
         "--skip-dotnet-build",
@@ -189,6 +196,8 @@ def main() -> int:
             uart_cmd.extend(["--read-var", token])
         for token in args.write_vars:
             uart_cmd.extend(["--write-var", token])
+        for token in args.scope_vars:
+            uart_cmd.extend(["--scope-var", token])
         uart_rc = _run_step("UART smoke", uart_cmd, workdir, log_stream)
         summary.append(("UART smoke", uart_rc))
 

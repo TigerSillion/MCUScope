@@ -23,7 +23,7 @@
 
 - PC 侧：`MCUScope.exe`（WPF）
 - 传输层：UART（串口）
-- MCU 侧：`ICS2_RX26T.c` 负责协议解析、变量白名单读写、波形上传
+- MCU 侧：`ICS2_RX26T.c` 负责协议解析、按地址变量读写、波形上传
 
 数据流：
 
@@ -66,7 +66,7 @@ dotnet run --project src/MCUScope/MCUScope.csproj
 可先运行脚本做协议自检：
 
 ```bash
-python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-channels 0,1
+python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-var 0:0x00001829:u8 --scope-var 1:0x00007650:f32
 ```
 
 ---
@@ -180,62 +180,30 @@ python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-channels 0
 
 ---
 
-## 6. MCU 变量白名单（当前固件）
+## 6. MCU 变量访问机制（当前固件）
 
-说明：只有白名单内变量可被 UART 协议访问；写入还要求变量标记为可写。
+说明：
 
-| 序号 | 变量名 | 类型 | 权限 |
-|---|---|---|---|
-| 1 | `com_u1_system_mode` | UInt8 | RW |
-| 2 | `g_u1_system_mode` | UInt8 | RO |
-| 3 | `com_u1_ctrl_loop_mode` | UInt8 | RW |
-| 4 | `com_u1_sw_userif` | UInt8 | RW |
-| 5 | `com_u2_offset_calc_time` | UInt16 | RW |
-| 6 | `com_u2_charge_bootstrap_time` | UInt16 | RW |
-| 7 | `com_f4_ref_speed_rpm` | Float32 | RW |
-| 8 | `com_f4_speed_rate_limit_rpm` | Float32 | RW |
-| 9 | `com_f4_overspeed_limit_rpm` | Float32 | RW |
-| 10 | `com_f4_speed_omega_hz` | Float32 | RW |
-| 11 | `com_f4_speed_zeta` | Float32 | RW |
-| 12 | `com_f4_speed_lpf_hz` | Float32 | RW |
-| 13 | `com_f4_current_omega_hz` | Float32 | RW |
-| 14 | `com_f4_current_zeta` | Float32 | RW |
-| 15 | `com_f4_ol_ref_id` | Float32 | RW |
-| 16 | `g_st_sensorless_vector.f4_vdc_ad` | Float32 | RO |
-| 17 | `g_st_sensorless_vector.f4_iu_ad` | Float32 | RO |
-| 18 | `g_st_sensorless_vector.f4_iv_ad` | Float32 | RO |
-| 19 | `g_st_sensorless_vector.f4_iw_ad` | Float32 | RO |
-| 20 | `g_st_sensorless_vector.st_speed_output.f4_speed_rad_lpf` | Float32 | RO |
-| 21 | `g_st_sensorless_vector.st_speed_output.f4_ref_speed_rad_ctrl` | Float32 | RO |
-| 22 | `g_st_sensorless_vector.st_speed_output.f4_id_ref` | Float32 | RO |
-| 23 | `g_st_sensorless_vector.st_speed_output.f4_iq_ref` | Float32 | RO |
-| 24 | `g_st_sensorless_vector.st_current_output.f4_speed_rad` | Float32 | RO |
-| 25 | `g_st_sensorless_vector.st_current_output.f4_ref_id_ctrl` | Float32 | RO |
-| 26 | `g_st_sensorless_vector.st_current_output.f4_ed` | Float32 | RO |
-| 27 | `g_st_sensorless_vector.st_current_output.f4_eq` | Float32 | RO |
-| 28 | `g_st_sensorless_vector.st_current_output.f4_phase_err_rad` | Float32 | RO |
-| 29 | `g_st_sensorless_vector.st_stm.u1_status` | UInt8 | RO |
+- 当前固件已取消固定白名单。
+- GUI 按“变量地址 + 类型”直接发起读写请求。
+- 为避免访问无效地址导致异常，MCU 会做 RAM 区间校验（可在 `ICS2_RX26T.c` 宏中调整）。
+- 实际读写对象由你加载的 `.map/.sym/.csv/.xml` 变量文件决定。
+
+推荐做法：
+
+1. 始终从最新 map/sym 文件加载变量，不要手工猜地址。
+2. 写入前先读一次，确认类型和地址匹配。
+3. 对控制变量先小步修改，再观察反馈量。
 
 ---
 
-## 7. 示波通道固定映射（当前固件）
+## 7. 示波通道变量自由绑定（当前固件）
 
-当前 MCU 采样源在 `ICS2_RX26T.c` 内固定，不随 GUI 的变量名下拉动态切换。
+当前版本已支持“通道自由选变量”：
 
-| GUI通道 | MCU信号 |
-|---|---|
-| M1 | `speed_rad_lpf * MTR_RAD2RPM` |
-| M2 | `com_f4_ref_speed_rpm` |
-| M3 | `iq_ref` |
-| M4 | `id_ref` |
-| M5 | `iu_ad` |
-| M6 | `iv_ad` |
-| M7 | `iw_ad` |
-| M8 | `vdc_ad` |
-| M9 | `phase_err_rad * MTR_RAD2DEG` |
-| M10 | `ed` |
-| M11 | `eq` |
-| M12 | `stm.u1_status` |
+- GUI 每个通道（M1..M12）可独立选择任意变量名。
+- 启动采样时，GUI 会把每个可见通道对应的 `slot + type + address` 发送给 MCU。
+- MCU 按通道配置实时采样，不再绑定固定内置信号表。
 
 补充：
 
@@ -283,9 +251,9 @@ python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-channels 0
 
 ### 9.2 变量读写失败
 
-1. 变量必须在 MCU 白名单中。
-2. 写入变量必须是 `RW`。
-3. 写入类型必须与 MCU 变量类型一致。
+1. 检查变量地址是否来自当前固件 map/sym（旧地址会失败）。
+2. 检查读写类型是否匹配（如 `u8/i16/f32`）。
+3. 检查目标地址是否在 MCU 允许的 RAM 区间内。
 4. 建议先用 `uart_smoke.py` 对同一变量做读写验证。
 
 ### 9.3 示波图无数据
@@ -293,7 +261,7 @@ python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-channels 0
 1. 至少一个通道 `Visible=true` 且有名称。
 2. 串口已连接且 MCU 在运行控制循环。
 3. `SamplePeriod/RecordLength` 在 MCU支持范围内。
-4. 先选 M1/M2 两个基础通道确认链路。
+4. 检查该通道变量地址/类型是否有效（建议先在 Watch 中可读再上示波）。
 
 ---
 
@@ -306,7 +274,6 @@ python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-channels 0
 | ID | 问题 | 影响 | 目标验收 |
 |---|---|---|---|
 | P0-1 | `Variable Settings` 未真正回写变量元数据 | 类型/缩放/权限编辑无效 | 编辑后立即影响 Watch 读写与保存项目 |
-| P0-2 | Scope 通道变量名仅用于显示，采样源固定 | 用户误以为可动态绑定任意变量 | 增加“固定映射”显式提示，或实现真实动态映射协议 |
 | P0-3 | Trigger 参数 MCU 仅存储未参与触发判定 | 触发设置对采样行为无效 | 实现 Auto/Single/Normal 与边沿/阈值判定 |
 | P0-4 | Array Editor 读写未落地 | 无法用于数组在线调参 | 支持连续地址读写与批量 ACK/NACK 反馈 |
 | P0-5 | Custom Control Panel 未接协议 | 自定义控件不可控机 | Slider/Toggle/Display 全部接入读写 API |
@@ -334,7 +301,7 @@ python tools/uart_smoke.py --port COM5 --baud 1000000 --scope --scope-channels 0
 
 ## 11. 建议的执行顺序（落地节奏）
 
-1. 先做 P0-1/P0-2/P0-3，保证“变量配置-触发-采样”链路真实可用。
+1. 先做 P0-1/P0-3，保证“变量配置-触发-采样”链路真实可用。
 2. 再做 P0-4/P0-5/P0-6，补齐 Tools 三个窗口的真实控制能力。
 3. 完成 P1（Cursor/Roll/FFT/ACK 展示）提升调试效率。
 4. 最后做 P2（自动化与日志）保证持续迭代稳定。

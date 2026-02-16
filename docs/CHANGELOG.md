@@ -1,6 +1,10 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Added free global-variable address access on MCU UART protocol (removed fixed whitelist dependency) with RAM-range safety checks in `ICS2_RX26T.c`.
+- Added dynamic scope channel binding (`slot + type + address`) so GUI channels can sample arbitrary variables instead of fixed M1..M12 source mapping.
+- Updated PC protocol client (`IcsProtocolService`) and scope start flow (`MainViewModel`) to send address/type metadata per channel and support alias/display-name variable resolution.
+- Updated UART tooling/docs (`tools/uart_smoke.py`, `tools/run_regression.py`, `docs/UART_PROTOCOL.md`, `docs/USAGE.md`, `docs/TESTING.md`, `docs/GUI_OPERATION_MANUAL_CN.md`, `docs/MCU_CODE_AND_MOTOR_DEBUG_GUIDE.md`) for the new address-based read/write and dynamic scope format.
 - Added `docs/GUI_OPERATION_MANUAL_CN.md` as a full Chinese GUI operation manual (ICS-style chapter flow), including current implemented behavior, MCU-side variable/scope mapping tables, known GUI gaps, and a prioritized improvement plan (P0/P1/P2).
 - Fixed RX build linker issue `Undefined external symbol "___asm"` by removing unsupported inline `__asm("nop")` usage in `ICS2_RX26T.c`.
 - Added `docs/MCU_CODE_AND_MOTOR_DEBUG_GUIDE.md` as a dedicated MCU source explanation, variable usage reference, and motor no-rotation debug workflow.

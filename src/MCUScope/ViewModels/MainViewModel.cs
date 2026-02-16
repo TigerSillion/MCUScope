@@ -225,14 +225,39 @@ namespace MCUScope.ViewModels
         private void RunScope()
         {
             if (!_serialService.IsOpen) return;
-            IsScopeRunning = true;
-            ScopeStatusText = "Run";
 
             var activeChannels = ScopeValues
                 .Select((v, i) => new { v, i })
                 .Where(x => x.v.Visible && !string.IsNullOrEmpty(x.v.VariableName))
-                .Select(x => x.i)
+                .Select(x =>
+                {
+                    if (_icsService.TryResolveVariable(x.v.VariableName, out var variable))
+                    {
+                        return new ScopeChannelRequest
+                        {
+                            ChannelIndex = x.i,
+                            Address = variable.Address,
+                            Type = variable.ModifiedType
+                        };
+                    }
+
+                    return null;
+                })
+                .Where(ch => ch != null)
+                .Select(ch => ch!)
                 .ToArray();
+
+            if (activeChannels.Length == 0)
+            {
+                MessageBox.Show("No valid scope variable selected. Please load variable file and assign visible channels.",
+                    "Scope", MessageBoxButton.OK, MessageBoxImage.Warning);
+                IsScopeRunning = false;
+                ScopeStatusText = "Stop";
+                return;
+            }
+
+            IsScopeRunning = true;
+            ScopeStatusText = "Run";
 
             var trigger = new TriggerSettings
             {
@@ -537,7 +562,20 @@ namespace MCUScope.ViewModels
         {
             Application.Current?.Dispatcher.Invoke(() =>
             {
-                var watchItem = WatchItems.FirstOrDefault(w => w.Name == e.VariableName);
+                var watchItem = WatchItems.FirstOrDefault(w =>
+                {
+                    if (string.Equals(w.Name, e.VariableName, StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+
+                    if (_icsService.TryResolveVariable(w.Name, out var variable))
+                    {
+                        return string.Equals(variable.Name, e.VariableName, StringComparison.Ordinal);
+                    }
+
+                    return false;
+                });
                 if (watchItem != null)
                 {
                     watchItem.ReadValue = e.Value.ToString("G6");

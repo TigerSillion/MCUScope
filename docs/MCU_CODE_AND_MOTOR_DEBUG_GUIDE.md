@@ -68,7 +68,7 @@ python tools/cleanup_legacy_libs.py --delete --include-build-lib
 1. PC GUI sends UART frames (`0xAA 0x55`, command, payload length, payload, checksum).
 2. `ICS2_RX26T.c` RX ISR stores bytes in ring buffer.
 3. `ics2_watchpoint()` parses protocol and dispatches commands.
-4. Whitelisted variables are read/written safely.
+4. Variables are read/written by requested address + type (no fixed whitelist table).
 5. Scope sampling captures selected channels and returns waveform packets.
 
 ### 3.2 Motor Control Flow (High Level)
@@ -89,13 +89,13 @@ python tools/cleanup_legacy_libs.py --delete --include-build-lib
 - Implements:
   - Packet parser and checksum validation.
   - `GetInfo`, variable read/write, scope start/stop, trigger/sampling command handling.
-  - Whitelist-only variable access.
+  - Address-based variable access with RAM-region safety checks.
   - Waveform upload packetization.
 
 Key design constraints:
 
-- No arbitrary pointer write access.
-- All read/write variables must be listed in `s_scope_vars`.
+- No fixed variable table is required for runtime access.
+- Address/type requests are validated against configured RAM regions before dereference.
 - Scope data channel count and record length are bounded.
 
 ### 4.2 `r_motor_current_bemf_observer.c`
@@ -144,9 +144,9 @@ Key design constraints:
 - Computes torque/current transition commands using phase error and switch timing.
 
 
-## 5. UART Whitelist Variables: Usage And Debug Meaning
+## 5. Recommended Debug Variables: Usage And Meaning
 
-Variables are defined in `ICS2_RX26T.c` (`s_scope_vars` table).
+The following list is a recommended high-value debug set for motor bring-up and no-rotation analysis.
 
 | Variable | RW | Type | Usage | Debug meaning |
 |---|---|---|---|---|
@@ -308,4 +308,4 @@ Minimum watch list (recommended order):
   - algorithm responsibility
   - parameter usage
   - debug process and decision points
-- When additional runtime variables are needed for debug, extend `s_scope_vars` in `ICS2_RX26T.c` with read-only entries first, then document in this file.
+- When additional runtime variables are needed, add them to your variable file (`map/sym/csv/xml`) and bind them directly in GUI Watch/Scope.
