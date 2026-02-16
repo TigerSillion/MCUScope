@@ -1,6 +1,19 @@
 # DEV_LOG.md
 
 ## 2026-02-16
+Summary: Added dedicated MCU algorithm/debug documentation and implemented obsolete closed-lib cleanup tool.
+Files: tools/cleanup_legacy_libs.py, docs/MCU_CODE_AND_MOTOR_DEBUG_GUIDE.md, docs/USAGE.md, docs/TESTING.md, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- Added `docs/MCU_CODE_AND_MOTOR_DEBUG_GUIDE.md` as a standalone document covering MCU source architecture, module explanations, UART whitelist variable usage, tuning sequence, and "motor not rotating" debug workflow.
+- Added `tools/cleanup_legacy_libs.py` to dry-run or delete obsolete closed `.lib` files that are replaced by C implementations.
+- Updated usage/testing docs to include cleanup commands and pointer to the new dedicated debug guide.
+- Executed cleanup of obsolete closed libs in local firmware workspace (`--delete`), removing 9 legacy module `.lib` files under `src/application/...`.
+Tests:
+- `python tools/cleanup_legacy_libs.py` executed; dry-run found 9 removable legacy libs.
+- `python tools/cleanup_legacy_libs.py --delete` executed; removed 9 legacy libs.
+- `python -m py_compile tools/cleanup_legacy_libs.py` executed; passed.
+
+## 2026-02-16
 Summary: Cleaned up stale ViewModel fields to eliminate remaining WPF build warnings.
 Files: src/MCUScope/ViewModels/MainViewModel.cs, docs/CHANGELOG.md, docs/DEV_LOG.md.
 Behavior:

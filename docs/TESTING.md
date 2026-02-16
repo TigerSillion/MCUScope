@@ -42,6 +42,10 @@ Run from repository root:
 8. Persist UART smoke output in custom file:
 `python tools/uart_smoke.py --dry-run --scope --scope-channels 0,1 --log-file logs/uart_smoke_latest.log`
 
+9. Verify and clean obsolete closed libs after source replacement:
+`python tools/cleanup_legacy_libs.py`
+`python tools/cleanup_legacy_libs.py --delete`
+
 ## PC-side Checks
 
 1. Open GUI and connect to target COM port.

@@ -1,6 +1,8 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Added `docs/MCU_CODE_AND_MOTOR_DEBUG_GUIDE.md` as a dedicated MCU source explanation, variable usage reference, and motor no-rotation debug workflow.
+- Added `tools/cleanup_legacy_libs.py` to detect/remove obsolete closed `.lib` artifacts now replaced by C source files.
 - Removed stale unused `MainViewModel` fields (`_autoSaveTimer`, `_isRunning`) to clear build warnings.
 - Added `tools/run_regression.py` batch runner to execute artifact checks, UART smoke, and `dotnet build` with timestamped logs.
 - Enhanced `tools/check_mcu_artifacts.py` with map freshness detection (warn by default, optional fail mode).

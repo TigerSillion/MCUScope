@@ -5,6 +5,8 @@
 This project contains:
 - A PC GUI (`src/MCUScope`) that talks to MCU over UART.
 - A reference RX26T firmware project under `Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100`.
+- A detailed MCU algorithm + variable + troubleshooting guide:
+`docs/MCU_CODE_AND_MOTOR_DEBUG_GUIDE.md`.
 
 The closed `ICS2_RX26T.lib` path is replaced by a C implementation:
 - `Reference/RX26T_MCBA2_MCILV1_PM_LESS_FOC_WFS_E2S_V100/src/application/user_interface/ics/ICS2_RX26T.c`
@@ -81,10 +83,15 @@ Use these scripts from repository root to speed up regression checks.
 7. Save UART smoke output into a file:
 `python tools/uart_smoke.py --dry-run --scope --scope-channels 0,1 --log-file logs/uart_smoke_latest.log`
 
+8. Check and delete obsolete closed `.lib` files replaced by source code:
+`python tools/cleanup_legacy_libs.py`
+`python tools/cleanup_legacy_libs.py --delete`
+
 Notes:
 - `tools/uart_smoke.py` requires `pyserial` for live mode (`pip install pyserial`).
 - `--map` validation is strict and should be run with a freshly generated `.map` file.
 - `tools/run_regression.py` writes a timestamped log under `logs/` by default.
+- `tools/cleanup_legacy_libs.py --include-build-lib` also removes generated `HardwareDebug/*.lib` output.
 
 ## Closed Lib Replacement Status
 
