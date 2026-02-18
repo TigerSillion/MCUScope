@@ -1,0 +1,152 @@
+<UserControl x:Class="MCUScope.Views.FocDebugPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MCUScope.ViewModels">
+
+    <UserControl.Resources>
+        <CollectionViewSource x:Key="GroupedParams" Source="{Binding Parameters}">
+            <CollectionViewSource.GroupDescriptions>
+                <PropertyGroupDescription PropertyName="Group"/>
+            </CollectionViewSource.GroupDescriptions>
+        </CollectionViewSource>
+
+        <Style x:Key="MappedIndicator" TargetType="Ellipse">
+            <Setter Property="Width" Value="6"/>
+            <Setter Property="Height" Value="6"/>
+            <Setter Property="Margin" Value="2,0"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsMapped}" Value="True">
+                    <Setter Property="Fill" Value="#2EA043"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsMapped}" Value="False">
+                    <Setter Property="Fill" Value="#5A5A5A"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ModifiedText" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Width" Value="80"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="2,1"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsModified}" Value="True">
+                    <Setter Property="Foreground" Value="#D29922"/>
+                    <Setter Property="FontWeight" Value="Bold"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <DockPanel>
+        <!-- Header buttons -->
+        <StackPanel DockPanel.Dock="Top" Margin="4">
+            <!-- System control -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <TextBlock Text="System:" VerticalAlignment="Center" Margin="0,0,4,0" FontSize="11"
+                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                <Button Content="RUN" Width="44" Margin="2" FontSize="10" FontWeight="Bold"
+                        Background="#1A3A1A" Foreground="#2EA043"
+                        Command="{Binding SystemRunCommand}"/>
+                <Button Content="STOP" Width="44" Margin="2" FontSize="10" FontWeight="Bold"
+                        Background="#3A1A1A" Foreground="#F85149"
+                        Command="{Binding SystemStopCommand}"/>
+                <Button Content="RST" Width="38" Margin="2" FontSize="10"
+                        Command="{Binding SystemResetCommand}"/>
+                <TextBlock Text="{Binding SystemModeText}" VerticalAlignment="Center" Margin="6,0"
+                           FontWeight="Bold" FontSize="11"/>
+            </StackPanel>
+
+            <!-- Batch operations -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                <Button Content="Auto Discover" FontSize="10" Margin="2" Padding="6,2"
+                        Command="{Binding AutoDiscoverCommand}"/>
+                <Button Content="Read All" FontSize="10" Margin="2" Padding="6,2"
+                        Command="{Binding ReadAllCommand}"/>
+                <Button Content="Write Modified" FontSize="10" Margin="2" Padding="6,2"
+                        Command="{Binding WriteAllCommand}"/>
+            </StackPanel>
+
+            <TextBlock FontSize="10" Margin="2,0" Foreground="{StaticResource TextSecondaryBrush}">
+                <Run Text="Mapped: "/><Run Text="{Binding MappedCount, Mode=OneWay}"/>
+                <Run Text=" / "/><Run Text="{Binding TotalCount, Mode=OneWay}"/>
+            </TextBlock>
+        </StackPanel>
+
+        <!-- Parameter list grouped by category -->
+        <ListView ItemsSource="{Binding Source={StaticResource GroupedParams}}"
+                  Background="Transparent" BorderThickness="0"
+                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListView.GroupStyle>
+                <GroupStyle>
+                    <GroupStyle.HeaderTemplate>
+                        <DataTemplate>
+                            <Border Background="{StaticResource ElevatedBgBrush}"
+                                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1"
+                                    Padding="4,3" Margin="0,4,0,0">
+                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="11"
+                                           Foreground="{StaticResource AccentBrush}"/>
+                            </Border>
+                        </DataTemplate>
+                    </GroupStyle.HeaderTemplate>
+                </GroupStyle>
+            </ListView.GroupStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="0,1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="45"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="20"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Ellipse Grid.Column="0" Style="{StaticResource MappedIndicator}" VerticalAlignment="Center"/>
+
+                        <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12"
+                                   VerticalAlignment="Center" Margin="2,0"
+                                   ToolTip="{Binding VariableName}"
+                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+
+                        <TextBox Grid.Column="2" Style="{StaticResource ModifiedText}"
+                                 Width="100"
+                                 Text="{Binding Value, StringFormat={}{0:G6}, UpdateSourceTrigger=LostFocus}"
+                                 IsEnabled="{Binding IsMapped}"/>
+
+                        <TextBlock Grid.Column="3" Text="{Binding Unit}" FontSize="10"
+                                   VerticalAlignment="Center" Margin="2,0"
+                                   Foreground="{StaticResource TextMutedBrush}"/>
+
+                        <Button Grid.Column="4" Content="R" FontSize="8" Padding="1" Margin="1"
+                                ToolTip="Read"
+                                Command="{Binding DataContext.ReadSelectedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}"/>
+
+                        <Button Grid.Column="5" Content="W" FontSize="8" Padding="1" Margin="1"
+                                ToolTip="Write"
+                                Command="{Binding DataContext.WriteSelectedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}"/>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="0"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListViewItem">
+                                <ContentPresenter/>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListView.ItemContainerStyle>
+        </ListView>
+    </DockPanel>
+</UserControl>

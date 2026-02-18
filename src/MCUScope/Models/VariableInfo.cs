@@ -24,6 +24,9 @@ namespace MCUScope.Models
         public bool ReadEnabled { get; set; } = true;
         public bool WriteEnabled { get; set; }
         public string Comment { get; set; } = string.Empty;
+        public bool IsGlobal { get; set; } = true;
+        public string Category { get; set; } = string.Empty;
+        public int DeclaredSize { get; set; }
 
         public string DisplayName => string.IsNullOrEmpty(Alias) ? Name : Alias;
 
@@ -34,6 +37,20 @@ namespace MCUScope.Models
             VariableType.UInt32 or VariableType.Int32 or VariableType.Float32 => 4,
             _ => 4
         };
+
+        public int EffectiveSize => DeclaredSize > 0 ? DeclaredSize : ByteSize;
+
+        public bool IsProtocolScalar => EffectiveSize is 1 or 2 or 4;
+
+        public bool IsLikelyInternal =>
+            Name.StartsWith(".L_", System.StringComparison.Ordinal) ||
+            Name.StartsWith("Region$$", System.StringComparison.Ordinal) ||
+            Name.StartsWith("g_ics2", System.StringComparison.OrdinalIgnoreCase) ||
+            Name.StartsWith("g_lpuart", System.StringComparison.OrdinalIgnoreCase) ||
+            Name.StartsWith("hdma_", System.StringComparison.OrdinalIgnoreCase) ||
+            Name.StartsWith("hlpuart", System.StringComparison.OrdinalIgnoreCase) ||
+            Name.Equals("uwTick", System.StringComparison.OrdinalIgnoreCase) ||
+            Name.Equals("SystemCoreClock", System.StringComparison.OrdinalIgnoreCase);
 
         public VariableInfo Clone()
         {
@@ -48,6 +65,8 @@ namespace MCUScope.Models
                 ReadEnabled = ReadEnabled,
                 WriteEnabled = WriteEnabled,
                 Comment = Comment
+                ,
+                DeclaredSize = DeclaredSize
             };
         }
     }

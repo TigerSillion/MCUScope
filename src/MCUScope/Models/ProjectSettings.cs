@@ -23,6 +23,10 @@ namespace MCUScope.Models
         public bool CursorX2 { get; set; }
         public bool CursorY1 { get; set; }
         public bool CursorY2 { get; set; }
+        public double CursorX1Position { get; set; } = 0.002;
+        public double CursorX2Position { get; set; } = 0.005;
+        public double CursorY1Position { get; set; }
+        public double CursorY2Position { get; set; } = 1.0;
     }
 
     public class FftSettings
@@ -48,6 +52,8 @@ namespace MCUScope.Models
 
     public class ProjectSettings
     {
+        public int Version { get; set; } = 2;
+        public string ThemeName { get; set; } = "Dark";
         public string VariableFilePath { get; set; } = string.Empty;
         public TimeSettings Time { get; set; } = new();
         public TriggerSettings Trigger { get; set; } = new();

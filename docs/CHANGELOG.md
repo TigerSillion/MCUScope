@@ -1,6 +1,16 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Added `docs/GUI_AUTO_DEBUG_PLAN.md` with executable auto-debug workflow and GUI functional validation matrix (watch/scope/drag-drop/log diagnostics) for STM32 + RX dual-MAP scenarios.
+- Added protocol-side diagnostics and compatibility fixes for STM32 live debug:
+  - MCU now ACKs `Ping (0x01)` to stop health-monitor command errors.
+  - MCU NACK now carries reason code payload for easier GUI-side diagnosis.
+- Hardened GUI variable binding flow:
+  - filtered internal/non-scalar symbols from Watch/Scope dropdown source lists,
+  - blocked scope/watch read-write requests for non-protocol scalar variables,
+  - improved NACK reason text mapping in protocol logs.
+- Added drag-drop from Variable Browser to Scope channel table.
+- Added `tools/auto_debug_stm32.py` one-click automated validation (build + UART read/write/scope with map-based symbol resolution).
 - Extended `VariableFileService.LoadMapFormat` to support both RX CCRX map format and STM32 Keil/ARM map execution-region format in the same parser path.
 - Added Keil RAM-section variable extraction (`.data.*`, `.bss.*`, `.noinit.*`, `.zidata.*`) with linker-internal symbol filtering and dedup merge with existing CCRX results.
 - Added first STM32 protocol integration in `Reference/G431_KEIL_Sample` to support repository UART commands (`GetInfo/ReadVariable/WriteVariable/StartScope/StopScope/SetTrigger`) at `2000000` bps via `LPUART1`.

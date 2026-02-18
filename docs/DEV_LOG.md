@@ -1,6 +1,46 @@
 # DEV_LOG.md
 
 ## 2026-02-18
+Summary: Added a dedicated GUI auto-debug plan and executed full STM32 automated validation run.
+Files: docs/GUI_AUTO_DEBUG_PLAN.md, docs/DEV_LOG.md.
+Behavior:
+- Added `docs/GUI_AUTO_DEBUG_PLAN.md` with:
+  - dual MAP compatibility validation steps (STM32 Keil + RX CCRX),
+  - automated execution flow for `tools/auto_debug_stm32.py`,
+  - GUI functional validation matrix (watch/scope/drag-drop/logs),
+  - regression checklist and triage order.
+Tests:
+- `python tools/auto_debug_stm32.py --port COM7 --baud 2000000` executed; passed (`GetInfo/read/write/scope/stop` all pass).
+- `python tools/auto_debug_stm32.py --port COM7 --baud 2000000 --skip-build` executed; passed.
+
+## 2026-02-18
+Summary: Fixed high-frequency NACK/debugability issues, added scope drag-drop, and added one-click STM32 automated validation.
+Files: src/MCUScope/Models/VariableInfo.cs, src/MCUScope/Services/VariableFileService.cs, src/MCUScope/Services/SessionState.cs, src/MCUScope/Services/IcsProtocolService.cs, src/MCUScope/ViewModels/ScopeViewModel.cs, src/MCUScope/ViewModels/VariableBrowserViewModel.cs, src/MCUScope/Views/VariableBrowserPanel.xaml, src/MCUScope/Views/VariableBrowserPanel.xaml.cs, src/MCUScope/Views/MainWindow.xaml, src/MCUScope/Views/MainWindow.xaml.cs, Reference/G431_KEIL_Sample/Core/Src/usart.c, tools/auto_debug_stm32.py, docs/USAGE.md, docs/TESTING.md, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- GUI variable pipeline:
+  - Added `DeclaredSize` and scalar/internal symbol checks to `VariableInfo`.
+  - MAP parser now stamps declared symbol size and applies internal-symbol filtering earlier.
+  - Session variable-name list now excludes internal or non-scalar symbols to prevent invalid watch/scope bindings.
+- GUI runtime safety:
+  - Scope run path rejects non-scalar/internal variables before sending protocol commands.
+  - Read/write requests now skip invalid/read-only symbols with explicit log entries.
+  - NACK logs now decode reason code (`invalid payload`, `unsupported cmd`, `bad variable`, `bad scope`, etc.).
+- UX:
+  - Implemented drag-drop from Variable Browser DataGrid to Scope channel DataGrid row/first-empty channel.
+  - Added drop-time validation and log feedback.
+- STM32 firmware protocol:
+  - Added `Ping (0x01)` ACK handling.
+  - Added NACK payload reason codes for invalid payload/unsupported command/bad variable/write denied/bad scope/bad trigger.
+- Automation:
+  - Added `tools/auto_debug_stm32.py` for one-click build (optional) + map-symbol resolution + UART smoke read/write/scope.
+  - Added derived-offset fallback for struct-member addresses when Keil map does not emit nested member symbols.
+Tests:
+- `dotnet build MCUScope.sln` executed; passed (`0 warning`, `0 error`).
+- `python -m py_compile tools/auto_debug_stm32.py` executed; passed.
+- `python tools/auto_debug_stm32.py --port COM7 --baud 2000000 --skip-build` executed; passed (`GetInfo/read/write/scope/stop` all pass).
+- `dotnet run --project src/MCUScope/MCUScope.csproj` launched and process-alive check passed.
+
+## 2026-02-18
 Summary: Added dual MAP compatibility for STM32 Keil/ARM and RX CCRX variable parsing.
 Files: src/MCUScope/Services/VariableFileService.cs, docs/CHANGELOG.md, docs/DEV_LOG.md.
 Behavior:

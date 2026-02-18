@@ -94,6 +94,20 @@ Notes:
 - Replace `0xADDR` with real symbol addresses from STM32 map.
 - STM32 variable access currently uses a whitelist table in `Core/Src/usart.c`.
 
+## STM32 One-Click Auto Debug
+
+Use the automated checker to run GUI build + UART read/write/scope flow:
+
+`python tools/auto_debug_stm32.py --port COM7 --baud 2000000`
+
+If GUI was already built in current session:
+
+`python tools/auto_debug_stm32.py --port COM7 --baud 2000000 --skip-build`
+
+Detailed automated validation workflow is documented in:
+
+`docs/GUI_AUTO_DEBUG_PLAN.md`
+
 ## Regression Checklist
 
 After any protocol or variable map change:

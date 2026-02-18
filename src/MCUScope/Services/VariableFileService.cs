@@ -64,6 +64,13 @@ namespace MCUScope.Services
                         Address = address,
                         OriginalType = type,
                         ModifiedType = type,
+                        DeclaredSize = type switch
+                        {
+                            VariableType.UInt8 or VariableType.Int8 or VariableType.Bool or VariableType.Logic => 1,
+                            VariableType.UInt16 or VariableType.Int16 => 2,
+                            VariableType.UInt32 or VariableType.Int32 or VariableType.Float32 => 4,
+                            _ => 4
+                        },
                         Scale = parts.Length > 3 && double.TryParse(parts[3].Trim(), out var s) ? s : 1.0
                     };
                     variables.Add(variable);
@@ -116,6 +123,7 @@ namespace MCUScope.Services
 
                 string symbolName = symbolMatch.Groups[1].Value;
                 if (symbolName.StartsWith("__", StringComparison.Ordinal)) continue;
+                if (IsInternalSymbolName(symbolName)) continue;
 
                 bool isStructMember = symbolName.Contains('.');
 
@@ -146,6 +154,7 @@ namespace MCUScope.Services
                             Address = address,
                             OriginalType = type,
                             ModifiedType = type,
+                            DeclaredSize = size,
                             IsGlobal = isGlobal,
                             Category = category
                         });
@@ -176,6 +185,7 @@ namespace MCUScope.Services
                             Address = address,
                             OriginalType = type,
                             ModifiedType = type,
+                            DeclaredSize = size,
                             IsGlobal = false, // struct members are not independently global
                             Category = category
                         });
@@ -204,6 +214,8 @@ namespace MCUScope.Services
                 string sectionName = keil.Groups[3].Value;
                 if (!TryExtractKeilVariableName(sectionName, out var symbolName))
                     continue;
+                if (IsInternalSymbolName(symbolName))
+                    continue;
 
                 if (!seen.Add((symbolName, address)))
                     continue;
@@ -215,6 +227,7 @@ namespace MCUScope.Services
                     Address = address,
                     OriginalType = type,
                     ModifiedType = type,
+                    DeclaredSize = size,
                     IsGlobal = true,
                     Category = CategorizeVariable(symbolName)
                 });
@@ -234,6 +247,7 @@ namespace MCUScope.Services
                 uint address = ParseAddress(match.Groups[1].Value);
                 string name = match.Groups[2].Value;
                 if (name.StartsWith("__", StringComparison.Ordinal)) continue;
+                if (IsInternalSymbolName(name)) continue;
                 if (!int.TryParse(match.Groups[3].Value, NumberStyles.HexNumber,
                     CultureInfo.InvariantCulture, out var size) || size <= 0) continue;
 
@@ -250,12 +264,36 @@ namespace MCUScope.Services
                     Address = address,
                     OriginalType = type,
                     ModifiedType = type,
+                    DeclaredSize = size,
                     Category = CategorizeVariable(name)
                 });
             }
 
             LogService.Info($"MAP fallback: {variables.Count} variables from {Path.GetFileName(filePath)}");
             return variables;
+        }
+
+        private static bool IsInternalSymbolName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return true;
+            if (name.StartsWith(".L_", StringComparison.Ordinal))
+                return true;
+            if (name.StartsWith("Region$$", StringComparison.Ordinal))
+                return true;
+            if (name.StartsWith("g_ics2", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (name.StartsWith("g_lpuart", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (name.StartsWith("hdma_", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (name.StartsWith("hlpuart", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (name.Equals("uwTick", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (name.Equals("SystemCoreClock", StringComparison.OrdinalIgnoreCase))
+                return true;
+            return false;
         }
 
         private static bool TryExtractKeilVariableName(string sectionName, out string symbolName)
@@ -362,7 +400,8 @@ namespace MCUScope.Services
                         Name = name,
                         Address = address,
                         OriginalType = SizeToType(size),
-                        ModifiedType = SizeToType(size)
+                        ModifiedType = SizeToType(size),
+                        DeclaredSize = size
                     });
                 }
             }
@@ -394,6 +433,7 @@ namespace MCUScope.Services
                         Address = ParseAddress(addr),
                         OriginalType = ParseVariableType(typeStr),
                         ModifiedType = ParseVariableType(typeStr),
+                        DeclaredSize = 0,
                         Scale = double.TryParse(scaleStr, CultureInfo.InvariantCulture, out var s) ? s : 1.0
                     });
                 }

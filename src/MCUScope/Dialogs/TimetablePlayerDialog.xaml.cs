@@ -156,10 +156,10 @@ namespace MCUScope.Dialogs
                 });
 
                 // Write variables to target
+                var ics = Services.SessionState.Instance.IcsService;
                 for (int v = 0; v < _variableNames.Length; v++)
                 {
-                    // In real implementation, write via ICS protocol
-                    // _icsService.RequestWriteVariable(_variableNames[v], _values[v][_currentRow]);
+                    ics.RequestWriteVariable(_variableNames[v], _values[v][_currentRow]);
                 }
             }
 

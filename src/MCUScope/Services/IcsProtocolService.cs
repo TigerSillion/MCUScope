@@ -2,6 +2,8 @@ using MCUScope.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace MCUScope.Services
 {
@@ -45,14 +47,26 @@ namespace MCUScope.Services
         public VariableType Type { get; set; }
     }
 
+    public class ProtocolErrorEventArgs : EventArgs
+    {
+        public string Message { get; set; } = string.Empty;
+        public byte? NackReason { get; set; }
+    }
+
     public class IcsProtocolService : IDisposable
     {
         private readonly SerialCommunicationService _serial;
         private readonly List<byte> _receiveBuffer = new();
         private readonly object _bufferLock = new();
+        private CancellationTokenSource? _pingCts;
+        private int _missedPings;
+        private DateTime _lastResponseTime = DateTime.UtcNow;
 
         public event EventHandler<WaveformDataEventArgs>? WaveformDataReceived;
         public event EventHandler<VariableReadEventArgs>? VariableValueReceived;
+        public event EventHandler<ProtocolErrorEventArgs>? ProtocolError;
+        public event EventHandler? AckReceived;
+        public event EventHandler? ConnectionLost;
 
         public List<VariableInfo> Variables { get; private set; } = new();
 
@@ -115,8 +129,34 @@ namespace MCUScope.Services
 
         private void HandlePacket(byte command, byte[] payload)
         {
+            _lastResponseTime = DateTime.UtcNow;
+            _missedPings = 0;
+
             switch (command)
             {
+                case IcsCommands.Ack:
+                    LogService.Debug("ACK received");
+                    AckReceived?.Invoke(this, EventArgs.Empty);
+                    break;
+                case IcsCommands.Nack:
+                    byte reason = payload.Length > 0 ? payload[0] : (byte)0;
+                    string reasonText = reason switch
+                    {
+                        0x01 => "Invalid payload",
+                        0x02 => "Unsupported command",
+                        0x03 => "Invalid variable address/type",
+                        0x04 => "Write denied",
+                        0x05 => "Invalid scope config",
+                        0x06 => "Invalid trigger config",
+                        _ => "Unknown reason"
+                    };
+                    LogService.Warn($"NACK received, reason: 0x{reason:X2} ({reasonText})");
+                    ProtocolError?.Invoke(this, new ProtocolErrorEventArgs
+                    {
+                        Message = $"Command rejected by MCU (NACK 0x{reason:X2}: {reasonText})",
+                        NackReason = reason
+                    });
+                    break;
                 case IcsCommands.InfoResponse:
                     HandleInfoResponse(payload);
                     break;
@@ -125,6 +165,9 @@ namespace MCUScope.Services
                     break;
                 case IcsCommands.WaveformData:
                     HandleWaveformData(payload);
+                    break;
+                default:
+                    LogService.Debug($"Unknown command 0x{command:X2}, payload {payload.Length} bytes");
                     break;
             }
         }
@@ -146,7 +189,7 @@ namespace MCUScope.Services
                 float clock = BitConverter.ToSingle(payload, offset);
                 _serial.SetConnected(cpuName, libVersion, clock);
             }
-            catch { }
+            catch (Exception ex) { LogService.Warn($"Failed to parse InfoResponse: {ex.Message}"); }
         }
 
         private void HandleVariableData(byte[] payload)
@@ -175,7 +218,7 @@ namespace MCUScope.Services
                     Value = value
                 });
             }
-            catch { }
+            catch (Exception ex) { LogService.Warn($"Failed to parse VariableData: {ex.Message}"); }
         }
 
         private void HandleWaveformData(byte[] payload)
@@ -205,7 +248,7 @@ namespace MCUScope.Services
                     SamplePeriod = samplePeriod
                 });
             }
-            catch { }
+            catch (Exception ex) { LogService.Warn($"Failed to parse WaveformData: {ex.Message}"); }
         }
 
         public static double DecodeValue(byte[] data, int offset, VariableType type)
@@ -269,6 +312,11 @@ namespace MCUScope.Services
         public void RequestReadVariable(string variableName)
         {
             if (!TryResolveVariable(variableName, out var variable)) return;
+            if (variable.IsLikelyInternal || !variable.IsProtocolScalar)
+            {
+                LogService.Warn($"Read skipped: '{variable.Name}' is not a scalar protocol variable.");
+                return;
+            }
 
             var nameBytes = System.Text.Encoding.ASCII.GetBytes(variable.Name);
             var payload = new byte[6 + nameBytes.Length];
@@ -285,6 +333,16 @@ namespace MCUScope.Services
         public void RequestWriteVariable(string variableName, double value)
         {
             if (!TryResolveVariable(variableName, out var variable)) return;
+            if (variable.IsLikelyInternal || !variable.IsProtocolScalar)
+            {
+                LogService.Warn($"Write skipped: '{variable.Name}' is not a scalar protocol variable.");
+                return;
+            }
+            if (!variable.WriteEnabled)
+            {
+                LogService.Warn($"Write skipped: '{variable.Name}' is read-only in variable settings.");
+                return;
+            }
 
             double rawValue = variable.Scale != 0 ? value / variable.Scale : value;
             var nameBytes = System.Text.Encoding.ASCII.GetBytes(variable.Name);
@@ -347,8 +405,63 @@ namespace MCUScope.Services
             _serial.SendCommand(IcsCommands.GetInfo, Array.Empty<byte>());
         }
 
+        public void SendPing()
+        {
+            _serial.SendCommand(IcsCommands.Ping, Array.Empty<byte>());
+        }
+
+        /// <summary>
+        /// Start periodic ping to monitor connection health.
+        /// </summary>
+        public void StartHealthMonitor(int intervalMs = 5000)
+        {
+            StopHealthMonitor();
+            _pingCts = new CancellationTokenSource();
+            _missedPings = 0;
+            _lastResponseTime = DateTime.UtcNow;
+            var token = _pingCts.Token;
+
+            Task.Run(async () =>
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    try
+                    {
+                        await Task.Delay(intervalMs, token);
+                        if (!_serial.IsOpen) continue;
+
+                        SendPing();
+
+                        // Check if we received any response since last check
+                        if ((DateTime.UtcNow - _lastResponseTime).TotalMilliseconds > intervalMs * 2)
+                        {
+                            _missedPings++;
+                            LogService.Warn($"Missed ping response ({_missedPings}/3)");
+
+                            if (_missedPings >= 3)
+                            {
+                                LogService.Error("Connection lost: 3 consecutive ping failures");
+                                ConnectionLost?.Invoke(this, EventArgs.Empty);
+                                _missedPings = 0;
+                            }
+                        }
+                    }
+                    catch (OperationCanceledException) { break; }
+                    catch (Exception ex) { LogService.Warn($"Health monitor error: {ex.Message}"); }
+                }
+            }, token);
+        }
+
+        public void StopHealthMonitor()
+        {
+            _pingCts?.Cancel();
+            _pingCts?.Dispose();
+            _pingCts = null;
+        }
+
         public void Dispose()
         {
+            StopHealthMonitor();
             _serial.DataReceived -= OnDataReceived;
         }
     }

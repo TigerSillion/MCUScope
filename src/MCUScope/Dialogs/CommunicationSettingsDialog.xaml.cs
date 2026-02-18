@@ -1,3 +1,4 @@
+using MCUScope.Services;
 using MCUScope.ViewModels;
 using System.Globalization;
 using System.Windows;
@@ -19,14 +20,15 @@ namespace MCUScope.Dialogs
         {
             InitializeComponent();
             _vm = vm;
+            var settings = SessionState.Instance.Settings;
 
             foreach (int baud in CommonBaudRates)
             {
                 BaudRateComboBox.Items.Add(baud.ToString(CultureInfo.InvariantCulture));
             }
 
-            BaudRateComboBox.Text = vm.Settings.Communication.BaudRate.ToString(CultureInfo.InvariantCulture);
-            ClockTextBox.Text = vm.Settings.Communication.BaseClockMHz.ToString("F2", CultureInfo.InvariantCulture);
+            BaudRateComboBox.Text = settings.Communication.BaudRate.ToString(CultureInfo.InvariantCulture);
+            ClockTextBox.Text = settings.Communication.BaseClockMHz.ToString("F2", CultureInfo.InvariantCulture);
             UpdateRateText();
             ClockTextBox.TextChanged += (s, e) => UpdateRateText();
             BaudRateComboBox.AddHandler(TextBoxBase.TextChangedEvent,
@@ -74,8 +76,8 @@ namespace MCUScope.Dialogs
                 return;
             }
 
-            _vm.Settings.Communication.BaudRate = baudOk ? baudRate : 0;
-            _vm.Settings.Communication.BaseClockMHz = clockOk ? clock : 0;
+            SessionState.Instance.Settings.Communication.BaudRate = baudOk ? baudRate : 0;
+            SessionState.Instance.Settings.Communication.BaseClockMHz = clockOk ? clock : 0;
             _vm.NotifyCommunicationSettingsChanged();
             DialogResult = true;
             Close();

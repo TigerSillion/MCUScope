@@ -9,5 +9,7 @@ namespace MCUScope.Models
         [ObservableProperty] private string _readValue = string.Empty;
         [ObservableProperty] private bool _writeEnabled;
         [ObservableProperty] private string _writeValue = string.Empty;
+        [ObservableProperty] private string _addressHex = string.Empty;
+        [ObservableProperty] private string _typeText = string.Empty;
     }
 }

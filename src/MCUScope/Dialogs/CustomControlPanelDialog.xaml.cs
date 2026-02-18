@@ -1,3 +1,4 @@
+using MCUScope.Services;
 using MCUScope.ViewModels;
 using System.Linq;
 using System.Windows;
@@ -18,14 +19,26 @@ namespace MCUScope.Dialogs
 
         private void OnAddSlider(object sender, RoutedEventArgs e)
         {
+            var session = SessionState.Instance;
             var panel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 4) };
 
             var varCombo = new ComboBox { Width = 100, Margin = new Thickness(4, 0, 4, 0) };
-            foreach (var name in _vm.VariableNames)
+            foreach (var name in session.VariableNames)
                 varCombo.Items.Add(name);
 
-            var slider = new Slider { Width = 200, Minimum = -1000, Maximum = 1000, Margin = new Thickness(4, 0, 4, 0) };
+            var minBox = new TextBox { Width = 50, Text = "-1000", Margin = new Thickness(2, 0, 0, 0), VerticalContentAlignment = VerticalAlignment.Center };
+            var maxBox = new TextBox { Width = 50, Text = "1000", Margin = new Thickness(2, 0, 4, 0), VerticalContentAlignment = VerticalAlignment.Center };
+            var slider = new Slider { Width = 150, Minimum = -1000, Maximum = 1000, Margin = new Thickness(4, 0, 4, 0) };
             var valueText = new TextBlock { Width = 60, VerticalAlignment = VerticalAlignment.Center };
+
+            minBox.LostFocus += (s, ev) =>
+            {
+                if (double.TryParse(minBox.Text, out var min)) slider.Minimum = min;
+            };
+            maxBox.LostFocus += (s, ev) =>
+            {
+                if (double.TryParse(maxBox.Text, out var max)) slider.Maximum = max;
+            };
 
             slider.ValueChanged += (s, ev) =>
             {
@@ -37,8 +50,8 @@ namespace MCUScope.Dialogs
             {
                 if (varCombo.SelectedItem is string varName && !string.IsNullOrEmpty(varName))
                 {
-                    // Write slider value to variable
-                    // _icsService.RequestWriteVariable(varName, slider.Value);
+                    session.IcsService.RequestWriteVariable(varName, slider.Value);
+                    LogService.Info($"CustomPanel: Write {varName} = {slider.Value:G4}");
                 }
             };
 
@@ -46,6 +59,8 @@ namespace MCUScope.Dialogs
             removeBtn.Click += (s, ev) => ControlPanel.Children.Remove(panel);
 
             panel.Children.Add(varCombo);
+            panel.Children.Add(minBox);
+            panel.Children.Add(maxBox);
             panel.Children.Add(slider);
             panel.Children.Add(valueText);
             panel.Children.Add(writeBtn);
@@ -56,10 +71,11 @@ namespace MCUScope.Dialogs
 
         private void OnAddToggle(object sender, RoutedEventArgs e)
         {
+            var session = SessionState.Instance;
             var panel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 4) };
 
             var varCombo = new ComboBox { Width = 100, Margin = new Thickness(4, 0, 4, 0) };
-            foreach (var name in _vm.VariableNames)
+            foreach (var name in session.VariableNames)
                 varCombo.Items.Add(name);
 
             var toggle = new ToggleButton { Content = "OFF", Width = 60, Margin = new Thickness(4, 0, 4, 0) };
@@ -68,7 +84,8 @@ namespace MCUScope.Dialogs
                 toggle.Content = "ON";
                 if (varCombo.SelectedItem is string varName && !string.IsNullOrEmpty(varName))
                 {
-                    // Write 1 to variable
+                    session.IcsService.RequestWriteVariable(varName, 1.0);
+                    LogService.Info($"CustomPanel: Toggle {varName} = ON");
                 }
             };
             toggle.Unchecked += (s, ev) =>
@@ -76,7 +93,8 @@ namespace MCUScope.Dialogs
                 toggle.Content = "OFF";
                 if (varCombo.SelectedItem is string varName && !string.IsNullOrEmpty(varName))
                 {
-                    // Write 0 to variable
+                    session.IcsService.RequestWriteVariable(varName, 0.0);
+                    LogService.Info($"CustomPanel: Toggle {varName} = OFF");
                 }
             };
 
@@ -92,10 +110,11 @@ namespace MCUScope.Dialogs
 
         private void OnAddDisplay(object sender, RoutedEventArgs e)
         {
+            var session = SessionState.Instance;
             var panel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 4) };
 
             var varCombo = new ComboBox { Width = 100, Margin = new Thickness(4, 0, 4, 0) };
-            foreach (var name in _vm.VariableNames)
+            foreach (var name in session.VariableNames)
                 varCombo.Items.Add(name);
 
             var valueText = new TextBlock
@@ -107,13 +126,28 @@ namespace MCUScope.Dialogs
                 Margin = new Thickness(4, 0, 4, 0)
             };
 
+            // Subscribe to variable read events to update this display
+            session.IcsService.VariableValueReceived += (s2, ev2) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    if (varCombo.SelectedItem is string varName)
+                    {
+                        if (string.Equals(ev2.VariableName, varName, System.StringComparison.Ordinal))
+                            valueText.Text = ev2.Value.ToString("G6");
+                        else if (session.IcsService.TryResolveVariable(varName, out var vi) &&
+                                 string.Equals(vi.Name, ev2.VariableName, System.StringComparison.Ordinal))
+                            valueText.Text = ev2.Value.ToString("G6");
+                    }
+                });
+            };
+
             var readBtn = new Button { Content = "Read", Width = 50, Margin = new Thickness(4, 0, 4, 0) };
             readBtn.Click += (s, ev) =>
             {
                 if (varCombo.SelectedItem is string varName && !string.IsNullOrEmpty(varName))
                 {
-                    // Read variable value
-                    // _icsService.RequestReadVariable(varName);
+                    session.IcsService.RequestReadVariable(varName);
                 }
             };
 

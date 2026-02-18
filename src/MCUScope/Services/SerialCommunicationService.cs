@@ -101,8 +101,9 @@ namespace MCUScope.Services
                     _serialPort.Write(data, 0, data.Length);
                     return true;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    LogService.Warn($"Serial Send failed: {ex.Message}");
                     return false;
                 }
             }
@@ -143,10 +144,11 @@ namespace MCUScope.Services
                 {
                     break;
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     if (!token.IsCancellationRequested)
                     {
+                        LogService.Warn($"Serial ReadLoop error: {ex.Message}");
                         Thread.Sleep(100);
                     }
                 }

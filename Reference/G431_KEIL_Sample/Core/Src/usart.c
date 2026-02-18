@@ -32,6 +32,7 @@
 
 #define ICS2_SYNC1                    0xAAU
 #define ICS2_SYNC2                    0x55U
+#define ICS2_CMD_PING                 0x01U
 #define ICS2_CMD_GET_INFO             0x02U
 #define ICS2_CMD_READ_VARIABLE        0x10U
 #define ICS2_CMD_WRITE_VARIABLE       0x11U
@@ -47,6 +48,13 @@
 #define ICS2_MAX_PAYLOAD_SIZE         192U
 #define ICS2_MAX_SCOPE_CHANNELS       12U
 #define ICS2_MAX_SCOPE_RECORD_LENGTH  128U
+#define ICS2_NACK_UNKNOWN             0x00U
+#define ICS2_NACK_INVALID_PAYLOAD     0x01U
+#define ICS2_NACK_UNSUPPORTED_CMD     0x02U
+#define ICS2_NACK_BAD_VARIABLE        0x03U
+#define ICS2_NACK_WRITE_DENIED        0x04U
+#define ICS2_NACK_BAD_SCOPE_CONFIG    0x05U
+#define ICS2_NACK_BAD_TRIGGER_CONFIG  0x06U
 
 typedef enum
 {
@@ -154,6 +162,7 @@ static uint8_t ICS2_CalcChecksum(uint8_t cmd, uint16_t len, const uint8_t *paylo
 static void ICS2_SendFrame(uint8_t cmd, const uint8_t *payload, uint16_t len);
 static void ICS2_SendAck(void);
 static void ICS2_SendNack(void);
+static void ICS2_SendNackWithReason(uint8_t reason);
 static uint8_t ICS2_GetTypeSize(uint8_t type);
 static const Ics2VarEntry_t *ICS2_FindVariable(uint32_t address, uint8_t type);
 static uint8_t ICS2_ReadVariableRaw(const Ics2VarEntry_t *entry, uint8_t *out_raw);
@@ -445,6 +454,13 @@ static void ICS2_SendNack(void)
   ICS2_SendFrame(ICS2_CMD_NACK, 0, 0U);
 }
 
+static void ICS2_SendNackWithReason(uint8_t reason)
+{
+  uint8_t payload[1];
+  payload[0] = reason;
+  ICS2_SendFrame(ICS2_CMD_NACK, payload, 1U);
+}
+
 static uint8_t ICS2_GetTypeSize(uint8_t type)
 {
   switch (type)
@@ -585,14 +601,14 @@ static void ICS2_HandleReadVariable(const uint8_t *payload, uint16_t len)
 
   if (len < 6U)
   {
-    ICS2_SendNack();
+    ICS2_SendNackWithReason(ICS2_NACK_INVALID_PAYLOAD);
     return;
   }
 
   name_len = payload[idx++];
   if (len < (uint16_t)(1U + name_len + 5U))
   {
-    ICS2_SendNack();
+    ICS2_SendNackWithReason(ICS2_NACK_INVALID_PAYLOAD);
     return;
   }
   idx = (uint16_t)(idx + name_len);
@@ -606,7 +622,7 @@ static void ICS2_HandleReadVariable(const uint8_t *payload, uint16_t len)
   entry = ICS2_FindVariable(address, type);
   if (entry == 0)
   {
-    ICS2_SendNack();
+    ICS2_SendNackWithReason(ICS2_NACK_BAD_VARIABLE);
     return;
   }
 
@@ -630,14 +646,14 @@ static void ICS2_HandleWriteVariable(const uint8_t *payload, uint16_t len)
 
   if (len < 7U)
   {
-    ICS2_SendNack();
+    ICS2_SendNackWithReason(ICS2_NACK_INVALID_PAYLOAD);
     return;
   }
 
   name_len = payload[idx++];
   if (len < (uint16_t)(1U + name_len + 5U))
   {
-    ICS2_SendNack();
+    ICS2_SendNackWithReason(ICS2_NACK_INVALID_PAYLOAD);
     return;
   }
   idx = (uint16_t)(idx + name_len);
@@ -651,20 +667,20 @@ static void ICS2_HandleWriteVariable(const uint8_t *payload, uint16_t len)
 
   if ((size == 0U) || ((uint16_t)(idx + size) > len))
   {
-    ICS2_SendNack();
+    ICS2_SendNackWithReason(ICS2_NACK_INVALID_PAYLOAD);
     return;
   }
 
   entry = ICS2_FindVariable(address, type);
   if (entry == 0)
   {
-    ICS2_SendNack();
+    ICS2_SendNackWithReason(ICS2_NACK_BAD_VARIABLE);
     return;
   }
 
   if (ICS2_WriteVariableRaw(entry, &payload[idx], size) == 0U)
   {
-    ICS2_SendNack();
+    ICS2_SendNackWithReason(ICS2_NACK_WRITE_DENIED);
     return;
   }
 
@@ -685,7 +701,7 @@ static void ICS2_HandleStartScope(const uint8_t *payload, uint16_t len)
 
   if (len < 9U)
   {
-    ICS2_SendNack();
+    ICS2_SendNackWithReason(ICS2_NACK_BAD_SCOPE_CONFIG);
     return;
   }
 
@@ -697,17 +713,17 @@ static void ICS2_HandleStartScope(const uint8_t *payload, uint16_t len)
 
   if ((channel_count == 0U) || (channel_count > ICS2_MAX_SCOPE_CHANNELS))
   {
-    ICS2_SendNack();
+    ICS2_SendNackWithReason(ICS2_NACK_BAD_SCOPE_CONFIG);
     return;
   }
   if ((record_length <= 0) || (record_length > (int32_t)ICS2_MAX_SCOPE_RECORD_LENGTH))
   {
-    ICS2_SendNack();
+    ICS2_SendNackWithReason(ICS2_NACK_BAD_SCOPE_CONFIG);
     return;
   }
   if (len != (uint16_t)(9U + ((uint16_t)channel_count * 6U)))
   {
-    ICS2_SendNack();
+    ICS2_SendNackWithReason(ICS2_NACK_BAD_SCOPE_CONFIG);
     return;
   }
 
@@ -723,14 +739,14 @@ static void ICS2_HandleStartScope(const uint8_t *payload, uint16_t len)
 
     if (slot >= ICS2_MAX_SCOPE_CHANNELS)
     {
-      ICS2_SendNack();
+      ICS2_SendNackWithReason(ICS2_NACK_BAD_SCOPE_CONFIG);
       return;
     }
 
     entry = ICS2_FindVariable(address, type);
     if (entry == 0)
     {
-      ICS2_SendNack();
+      ICS2_SendNackWithReason(ICS2_NACK_BAD_SCOPE_CONFIG);
       return;
     }
 
@@ -764,7 +780,7 @@ static void ICS2_HandleSetTrigger(const uint8_t *payload, uint16_t len)
 {
   if (len != 11U)
   {
-    ICS2_SendNack();
+    ICS2_SendNackWithReason(ICS2_NACK_BAD_TRIGGER_CONFIG);
     return;
   }
 
@@ -780,6 +796,9 @@ static void ICS2_HandleFrame(uint8_t cmd, const uint8_t *payload, uint16_t len)
 {
   switch (cmd)
   {
+    case ICS2_CMD_PING:
+      ICS2_SendAck();
+      break;
     case ICS2_CMD_GET_INFO:
       ICS2_HandleGetInfo();
       break;
@@ -799,7 +818,7 @@ static void ICS2_HandleFrame(uint8_t cmd, const uint8_t *payload, uint16_t len)
       ICS2_HandleSetTrigger(payload, len);
       break;
     default:
-      ICS2_SendNack();
+      ICS2_SendNackWithReason(ICS2_NACK_UNSUPPORTED_CMD);
       break;
   }
 }
@@ -873,7 +892,7 @@ static void ICS2_OnByteReceived(uint8_t byte)
       }
       else
       {
-        ICS2_SendNack();
+        ICS2_SendNackWithReason(ICS2_NACK_INVALID_PAYLOAD);
       }
       g_ics2RxState = Ics2StateWaitSync1;
       break;

@@ -3,297 +3,59 @@ using CommunityToolkit.Mvvm.Input;
 using MCUScope.Models;
 using MCUScope.Services;
 using Microsoft.Win32;
-using OxyPlot;
-using OxyPlot.Axes;
-using OxyPlot.Series;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Media;
-using MathNet.Numerics;
-using MathNet.Numerics.IntegralTransforms;
+using System.Windows.Threading;
 
 namespace MCUScope.ViewModels
 {
     public partial class MainViewModel : ObservableObject, IDisposable
     {
-        private readonly SerialCommunicationService _serialService;
-        private readonly IcsProtocolService _icsService;
-        private CancellationTokenSource? _autoReadCts;
-        private Task? _autoReadTask;
-        private string _currentProjectPath = string.Empty;
+        private readonly SessionState _session;
 
-        // Scope state
-        private readonly Dictionary<int, double[]> _channelData = new();
-        private double _currentSamplePeriod = 0.0001;
+        public CommunicationViewModel Communication { get; }
+        public ScopeViewModel Scope { get; }
+        public WatchViewModel Watch { get; }
+        public FocDebugViewModel FocDebug { get; }
+        public VariableBrowserViewModel VariableBrowser { get; }
+
+        public LocalizationService Localization => LocalizationService.Instance;
+
+        [ObservableProperty] private string _languageButtonText = "EN";
 
         public MainViewModel()
         {
-            _serialService = new SerialCommunicationService();
-            _icsService = new IcsProtocolService(_serialService);
-
-            _serialService.ConnectionStatusChanged += OnConnectionStatusChanged;
-            _icsService.WaveformDataReceived += OnWaveformDataReceived;
-            _icsService.VariableValueReceived += OnVariableValueReceived;
-
-            // Initialize channels (M1-M12)
-            var colors = new[] { Colors.Green, Colors.Red, Colors.Blue, Colors.Yellow,
-                Colors.Cyan, Colors.Magenta, Colors.Orange, Colors.White,
-                Colors.LimeGreen, Colors.Pink, Colors.LightBlue, Colors.Gold };
-
-            for (int i = 0; i < 12; i++)
-            {
-                var ch = new ScopeValueItem
-                {
-                    ChannelId = $"M{i + 1}",
-                    Color = colors[i % colors.Length],
-                    Visible = i == 0,
-                    ValPerDiv = 1.0,
-                    Position = 50.0
-                };
-                ScopeValues.Add(ch);
-            }
-
-            // Initialize watch items (24 max)
-            for (int i = 0; i < 24; i++)
-            {
-                WatchItems.Add(new WatchItem());
-            }
-
-            // Initialize plot models
-            InitializePlotModels();
-
-            // Initialize available COM ports
-            RefreshPorts();
-
-            // Default settings
-            Settings = new ProjectSettings();
-            UpdateSerialLocalStatus();
-        }
-
-        // Properties
-        [ObservableProperty] private string _statusText = "Disconnected";
-        [ObservableProperty] private ConnectionStatus _connectionStatus = ConnectionStatus.Disconnected;
-        [ObservableProperty] private ProjectSettings _settings = new();
-
-        // Time settings
-        [ObservableProperty] private string _timeMode = "Buffer";
-        [ObservableProperty] private double _secPerDiv = 0.001;
-        [ObservableProperty] private double _samplePeriod = 0.0001;
-        [ObservableProperty] private int _recordLength = 101;
-
-        // Trigger settings
-        [ObservableProperty] private double _triggerPosition;
-        [ObservableProperty] private double _triggerLevel;
-        [ObservableProperty] private TriggerSource _triggerSource = TriggerSource.EXT;
-        [ObservableProperty] private TriggerMode _triggerMode = TriggerMode.Single;
-        [ObservableProperty] private TriggerEdge _triggerEdge = TriggerEdge.Rise;
-
-        // Cursor settings
-        [ObservableProperty] private bool _cursorX1Enabled;
-        [ObservableProperty] private bool _cursorX2Enabled;
-        [ObservableProperty] private bool _cursorY1Enabled;
-        [ObservableProperty] private bool _cursorY2Enabled;
-
-        // Zoom settings
-        [ObservableProperty] private bool _zoomCursorEnabled;
-        [ObservableProperty] private double _zoomSecPerDiv = 0.0005;
-        [ObservableProperty] private double _zoomPosition = 50.0;
-
-        // FFT settings
-        [ObservableProperty] private bool _fftEnabled;
-        [ObservableProperty] private string _fftSource = "All";
-        [ObservableProperty] private string _fftScope = "All";
-        [ObservableProperty] private string _fftWindow = "Hann";
-        [ObservableProperty] private string _fftScale = "Rms";
-
-        // Save settings
-        [ObservableProperty] private bool _autoSaveEnabled;
-
-        // Watch settings
-        [ObservableProperty] private int _autoReadIntervalUs = 1000;
-        [ObservableProperty] private bool _isAutoReading;
-
-        // COM port
-        [ObservableProperty] private string _selectedPort = string.Empty;
-        [ObservableProperty] private ObservableCollection<string> _availablePorts = new();
-        [ObservableProperty] private string _serialLocalStatusText = "Port: -, Baud: -, Local: Disconnected";
-
-        // Cursor values display
-        [ObservableProperty] private string _cursorInfoText = "X1=---s, X2=---s, dX=---s, 1/dX=---Hz";
-
-        // Plot models
-        [ObservableProperty] private PlotModel _mainPlotModel = new();
-        [ObservableProperty] private PlotModel _zoomPlotModel = new();
-        [ObservableProperty] private PlotModel _fftPlotModel = new();
-
-        // Collections
-        public ObservableCollection<ScopeValueItem> ScopeValues { get; } = new();
-        public ObservableCollection<WatchItem> WatchItems { get; } = new();
-        public ObservableCollection<string> VariableNames { get; } = new();
-
-        // Running state
-        [ObservableProperty] private bool _isScopeRunning;
-        [ObservableProperty] private string _scopeStatusText = "Stop";
-
-        private void InitializePlotModels()
-        {
-            // Main scope chart
-            MainPlotModel = CreateScopePlotModel("Scope Chart");
-            ZoomPlotModel = CreateScopePlotModel("Zoom");
-            FftPlotModel = CreateFftPlotModel();
-        }
-
-        private PlotModel CreateScopePlotModel(string title)
-        {
-            var model = new PlotModel
-            {
-                Background = OxyColors.Black,
-                PlotAreaBorderColor = OxyColors.DarkGray,
-                TextColor = OxyColors.LightGray
-            };
-
-            model.Axes.Add(new LinearAxis
-            {
-                Position = AxisPosition.Bottom,
-                Title = "Time (s)",
-                MajorGridlineStyle = LineStyle.Solid,
-                MajorGridlineColor = OxyColor.FromRgb(40, 40, 40),
-                MinorGridlineStyle = LineStyle.Dot,
-                MinorGridlineColor = OxyColor.FromRgb(30, 30, 30),
-                AxislineColor = OxyColors.Gray,
-                TextColor = OxyColors.LightGray,
-                TitleColor = OxyColors.LightGray,
-                TicklineColor = OxyColors.Gray
-            });
-
-            model.Axes.Add(new LinearAxis
-            {
-                Position = AxisPosition.Left,
-                Title = "Value",
-                MajorGridlineStyle = LineStyle.Solid,
-                MajorGridlineColor = OxyColor.FromRgb(40, 40, 40),
-                MinorGridlineStyle = LineStyle.Dot,
-                MinorGridlineColor = OxyColor.FromRgb(30, 30, 30),
-                AxislineColor = OxyColors.Gray,
-                TextColor = OxyColors.LightGray,
-                TitleColor = OxyColors.LightGray,
-                TicklineColor = OxyColors.Gray
-            });
-
-            return model;
-        }
-
-        private PlotModel CreateFftPlotModel()
-        {
-            var model = new PlotModel
-            {
-                Background = OxyColors.Black,
-                PlotAreaBorderColor = OxyColors.DarkGray,
-                TextColor = OxyColors.LightGray
-            };
-
-            model.Axes.Add(new LinearAxis
-            {
-                Position = AxisPosition.Bottom,
-                Title = "Frequency (Hz)",
-                MajorGridlineStyle = LineStyle.Solid,
-                MajorGridlineColor = OxyColor.FromRgb(40, 40, 40),
-                AxislineColor = OxyColors.Gray,
-                TextColor = OxyColors.LightGray,
-                TitleColor = OxyColors.LightGray
-            });
-
-            model.Axes.Add(new LinearAxis
-            {
-                Position = AxisPosition.Left,
-                Title = "Magnitude",
-                MajorGridlineStyle = LineStyle.Solid,
-                MajorGridlineColor = OxyColor.FromRgb(40, 40, 40),
-                AxislineColor = OxyColors.Gray,
-                TextColor = OxyColors.LightGray,
-                TitleColor = OxyColors.LightGray
-            });
-
-            return model;
-        }
-
-        // ---- Commands ----
-
-        [RelayCommand]
-        private void RunScope()
-        {
-            if (!_serialService.IsOpen) return;
-
-            var activeChannels = ScopeValues
-                .Select((v, i) => new { v, i })
-                .Where(x => x.v.Visible && !string.IsNullOrEmpty(x.v.VariableName))
-                .Select(x =>
-                {
-                    if (_icsService.TryResolveVariable(x.v.VariableName, out var variable))
-                    {
-                        return new ScopeChannelRequest
-                        {
-                            ChannelIndex = x.i,
-                            Address = variable.Address,
-                            Type = variable.ModifiedType
-                        };
-                    }
-
-                    return null;
-                })
-                .Where(ch => ch != null)
-                .Select(ch => ch!)
-                .ToArray();
-
-            if (activeChannels.Length == 0)
-            {
-                MessageBox.Show("No valid scope variable selected. Please load variable file and assign visible channels.",
-                    "Scope", MessageBoxButton.OK, MessageBoxImage.Warning);
-                IsScopeRunning = false;
-                ScopeStatusText = "Stop";
-                return;
-            }
-
-            IsScopeRunning = true;
-            ScopeStatusText = "Run";
-
-            var trigger = new TriggerSettings
-            {
-                Position = TriggerPosition,
-                Level = TriggerLevel,
-                Source = TriggerSource,
-                Mode = TriggerMode,
-                Edge = TriggerEdge
-            };
-            _icsService.SetTrigger(trigger);
-            _icsService.StartScope(SamplePeriod, RecordLength, activeChannels);
+            _session = SessionState.Instance;
+            Communication = new CommunicationViewModel();
+            Scope = new ScopeViewModel();
+            Watch = new WatchViewModel();
+            FocDebug = new FocDebugViewModel();
+            VariableBrowser = new VariableBrowserViewModel();
         }
 
         [RelayCommand]
-        private void StopScope()
+        private void ToggleLanguage()
         {
-            IsScopeRunning = false;
-            ScopeStatusText = "Stop";
-            _icsService.StopScope();
+            Localization.ToggleLanguage();
+            LanguageButtonText = Localization.LanguageDisplayText;
         }
+
+        // ---- Project Commands ----
 
         [RelayCommand]
         private void NewProject()
         {
-            Settings = new ProjectSettings();
-            _icsService.Variables.Clear();
-            VariableNames.Clear();
-            foreach (var item in WatchItems) item.Name = string.Empty;
-            foreach (var item in ScopeValues) item.VariableName = string.Empty;
-            _currentProjectPath = string.Empty;
-            ClearChartData();
+            _session.Settings = new ProjectSettings();
+            _session.IcsService.Variables.Clear();
+            _session.VariableNames.Clear();
+            foreach (var item in Watch.WatchItems) item.Name = string.Empty;
+            foreach (var item in Scope.ScopeValues) item.VariableName = string.Empty;
+            _session.CurrentProjectPath = string.Empty;
+            Scope.ClearChartData();
         }
 
         [RelayCommand]
@@ -308,9 +70,10 @@ namespace MCUScope.ViewModels
             {
                 try
                 {
-                    Settings = ProjectFileService.LoadProject(dlg.FileName);
-                    _currentProjectPath = dlg.FileName;
-                    ApplySettings(Settings);
+                    var settings = ProjectFileService.LoadProject(dlg.FileName);
+                    _session.Settings = settings;
+                    _session.CurrentProjectPath = dlg.FileName;
+                    ApplySettings(settings);
                 }
                 catch (Exception ex)
                 {
@@ -323,12 +86,12 @@ namespace MCUScope.ViewModels
         [RelayCommand]
         private void SaveProject()
         {
-            if (string.IsNullOrEmpty(_currentProjectPath))
+            if (string.IsNullOrEmpty(_session.CurrentProjectPath))
             {
                 SaveProjectAs();
                 return;
             }
-            SaveProjectToFile(_currentProjectPath);
+            SaveProjectToFile(_session.CurrentProjectPath);
         }
 
         [RelayCommand]
@@ -341,7 +104,7 @@ namespace MCUScope.ViewModels
             };
             if (dlg.ShowDialog() == true)
             {
-                _currentProjectPath = dlg.FileName;
+                _session.CurrentProjectPath = dlg.FileName;
                 SaveProjectToFile(dlg.FileName);
             }
         }
@@ -350,8 +113,15 @@ namespace MCUScope.ViewModels
         {
             try
             {
-                CollectSettings();
-                ProjectFileService.SaveProject(path, Settings);
+                var settings = _session.Settings;
+                Scope.CollectSettings(settings);
+                settings.Communication = new CommunicationSettings
+                {
+                    PortName = Communication.SelectedPort,
+                    BaudRate = settings.Communication.BaudRate,
+                    BaseClockMHz = settings.Communication.BaseClockMHz
+                };
+                ProjectFileService.SaveProject(path, settings);
             }
             catch (Exception ex)
             {
@@ -360,8 +130,10 @@ namespace MCUScope.ViewModels
             }
         }
 
+        [ObservableProperty] private bool _isLoadingVariables;
+
         [RelayCommand]
-        private void LoadVariables()
+        private async Task LoadVariables()
         {
             var dlg = new OpenFileDialog
             {
@@ -369,42 +141,46 @@ namespace MCUScope.ViewModels
                 Title = "Load Variables"
             };
             if (dlg.ShowDialog() == true)
-            {
-                LoadVariableFile(dlg.FileName);
-            }
+                await LoadVariableFileAsync(dlg.FileName);
         }
 
         [RelayCommand]
-        private void UpdateVariables()
+        private async Task UpdateVariables()
         {
-            if (!string.IsNullOrEmpty(Settings.VariableFilePath) && File.Exists(Settings.VariableFilePath))
+            if (!string.IsNullOrEmpty(_session.Settings.VariableFilePath) &&
+                File.Exists(_session.Settings.VariableFilePath))
             {
-                LoadVariableFile(Settings.VariableFilePath);
+                await LoadVariableFileAsync(_session.Settings.VariableFilePath);
             }
             else
             {
-                LoadVariables();
+                await LoadVariables();
             }
         }
 
-        private void LoadVariableFile(string filePath)
+        private async Task LoadVariableFileAsync(string filePath)
         {
+            if (IsLoadingVariables) return;
+            IsLoadingVariables = true;
             try
             {
-                var variables = VariableFileService.LoadVariableFile(filePath);
-                _icsService.Variables.Clear();
-                _icsService.Variables.AddRange(variables);
-                Settings.VariableFilePath = filePath;
-
-                RebuildVariableNameList();
-
-                MessageBox.Show($"Variable information loaded: {variables.Count} items.", "Success",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                var variables = await Task.Run(() => VariableFileService.LoadVariableFile(filePath));
+                _session.IcsService.Variables.Clear();
+                _session.IcsService.Variables.AddRange(variables);
+                _session.Settings.VariableFilePath = filePath;
+                _session.RebuildVariableNameList();
+                FocDebug.AutoDiscoverCommand.Execute(null);
+                VariableBrowser.LoadFromVariables();
+                LogService.Info($"Loaded {variables.Count} variables from {Path.GetFileName(filePath)}");
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Failed to load variables: {ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                IsLoadingVariables = false;
             }
         }
 
@@ -420,7 +196,7 @@ namespace MCUScope.ViewModels
             {
                 try
                 {
-                    var chartData = CollectChartData();
+                    var chartData = Scope.CollectChartData();
                     if (dlg.FileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
                     {
                         ProjectFileService.SaveChartDataCsv(dlg.FileName, chartData);
@@ -428,7 +204,6 @@ namespace MCUScope.ViewModels
                     else
                     {
                         ProjectFileService.SaveChartData(dlg.FileName, chartData);
-                        // Also save CSV alongside
                         ProjectFileService.SaveChartDataCsv(dlg.FileName + ".csv", chartData);
                     }
                 }
@@ -453,7 +228,7 @@ namespace MCUScope.ViewModels
                 try
                 {
                     var chartData = ProjectFileService.LoadChartData(dlg.FileName);
-                    ApplyChartData(chartData);
+                    Scope.ApplyChartData(chartData);
                 }
                 catch (Exception ex)
                 {
@@ -463,476 +238,11 @@ namespace MCUScope.ViewModels
             }
         }
 
-        [RelayCommand]
-        private void ReadWatchVariables()
-        {
-            foreach (var item in WatchItems)
-            {
-                if (item.ReadEnabled && !string.IsNullOrEmpty(item.Name))
-                {
-                    _icsService.RequestReadVariable(item.Name);
-                }
-            }
-        }
-
-        [RelayCommand]
-        private void WriteWatchVariables()
-        {
-            foreach (var item in WatchItems)
-            {
-                if (item.WriteEnabled && !string.IsNullOrEmpty(item.Name) &&
-                    double.TryParse(item.WriteValue, out var value))
-                {
-                    _icsService.RequestWriteVariable(item.Name, value);
-                }
-            }
-        }
-
-        [RelayCommand]
-        private void ToggleAutoRead()
-        {
-            if (IsAutoReading)
-            {
-                StopAutoReadLoop();
-            }
-            else
-            {
-                StartAutoReadLoop();
-            }
-        }
-
-        [RelayCommand]
-        private void RefreshPorts()
-        {
-            AvailablePorts.Clear();
-            foreach (var port in SerialCommunicationService.GetAvailablePorts())
-                AvailablePorts.Add(port);
-
-            if (!string.IsNullOrEmpty(SelectedPort) && !AvailablePorts.Contains(SelectedPort))
-            {
-                SelectedPort = string.Empty;
-            }
-
-            UpdateSerialLocalStatus();
-        }
-
-        [RelayCommand]
-        private void ConnectPort()
-        {
-            if (string.IsNullOrEmpty(SelectedPort)) return;
-            int baudRate = ResolveBaudRate();
-            Settings.Communication.PortName = SelectedPort;
-            _serialService.Open(SelectedPort, baudRate);
-            _icsService.RequestInfo();
-            UpdateSerialLocalStatus();
-        }
-
-        [RelayCommand]
-        private void DisconnectPort()
-        {
-            StopScope();
-            _serialService.Close();
-            UpdateSerialLocalStatus();
-        }
-
-        // ---- Event Handlers ----
-
-        private void OnConnectionStatusChanged(object? sender, ConnectionStatusChangedEventArgs e)
-        {
-            Application.Current?.Dispatcher.Invoke(() =>
-            {
-                ConnectionStatus = e.Status;
-                StatusText = e.StatusText;
-                UpdateSerialLocalStatus();
-            });
-        }
-
-        private void OnWaveformDataReceived(object? sender, WaveformDataEventArgs e)
-        {
-            Application.Current?.Dispatcher.Invoke(() =>
-            {
-                _channelData[e.ChannelIndex] = e.Data;
-                _currentSamplePeriod = e.SamplePeriod;
-                UpdateMainChart();
-                if (FftEnabled)
-                    UpdateFftChart();
-                UpdateZoomChart();
-                UpdateScopeValues(e.ChannelIndex, e.Data);
-
-                if (AutoSaveEnabled)
-                    AutoSaveChartData();
-            });
-        }
-
-        private void OnVariableValueReceived(object? sender, VariableReadEventArgs e)
-        {
-            Application.Current?.Dispatcher.Invoke(() =>
-            {
-                var watchItem = WatchItems.FirstOrDefault(w =>
-                {
-                    if (string.Equals(w.Name, e.VariableName, StringComparison.Ordinal))
-                    {
-                        return true;
-                    }
-
-                    if (_icsService.TryResolveVariable(w.Name, out var variable))
-                    {
-                        return string.Equals(variable.Name, e.VariableName, StringComparison.Ordinal);
-                    }
-
-                    return false;
-                });
-                if (watchItem != null)
-                {
-                    watchItem.ReadValue = e.Value.ToString("G6");
-                }
-            });
-        }
-
-        // ---- Chart Update Methods ----
-
-        private void UpdateMainChart()
-        {
-            MainPlotModel.Series.Clear();
-
-            var timeAxis = MainPlotModel.Axes[0];
-            timeAxis.Minimum = 0;
-            timeAxis.Maximum = SecPerDiv * 10;
-
-            foreach (var kvp in _channelData)
-            {
-                if (kvp.Key >= ScopeValues.Count) continue;
-                var channel = ScopeValues[kvp.Key];
-                if (!channel.Visible) continue;
-
-                var series = new LineSeries
-                {
-                    Color = OxyColor.FromArgb(channel.Color.A, channel.Color.R, channel.Color.G, channel.Color.B),
-                    StrokeThickness = 1.5
-                };
-
-                for (int i = 0; i < kvp.Value.Length; i++)
-                {
-                    double time = i * _currentSamplePeriod;
-                    double value = (kvp.Value[i] + channel.Offset) / channel.ValPerDiv;
-                    double yPos = (channel.Position / 100.0 - 0.5) * 10 + value;
-                    series.Points.Add(new DataPoint(time, yPos));
-                }
-
-                MainPlotModel.Series.Add(series);
-            }
-
-            // Update header text
-            string header = $"{FormatTime(SecPerDiv)}/div, {FormatTime(_currentSamplePeriod)}/S, {ScopeStatusText}";
-            MainPlotModel.Title = header;
-            MainPlotModel.TitleFontSize = 10;
-            MainPlotModel.TitleColor = OxyColors.LightGray;
-
-            MainPlotModel.InvalidatePlot(true);
-        }
-
-        private void UpdateZoomChart()
-        {
-            ZoomPlotModel.Series.Clear();
-
-            double zoomCenter = ZoomPosition / 100.0 * SecPerDiv * 10;
-            double zoomWidth = ZoomSecPerDiv * 10;
-            double zoomStart = zoomCenter - zoomWidth / 2;
-            double zoomEnd = zoomCenter + zoomWidth / 2;
-
-            var timeAxis = ZoomPlotModel.Axes[0];
-            timeAxis.Minimum = zoomStart;
-            timeAxis.Maximum = zoomEnd;
-
-            foreach (var kvp in _channelData)
-            {
-                if (kvp.Key >= ScopeValues.Count) continue;
-                var channel = ScopeValues[kvp.Key];
-                if (!channel.Visible) continue;
-
-                var series = new LineSeries
-                {
-                    Color = OxyColor.FromArgb(channel.Color.A, channel.Color.R, channel.Color.G, channel.Color.B),
-                    StrokeThickness = 1.5
-                };
-
-                for (int i = 0; i < kvp.Value.Length; i++)
-                {
-                    double time = i * _currentSamplePeriod;
-                    if (time < zoomStart || time > zoomEnd) continue;
-                    double value = (kvp.Value[i] + channel.Offset) / channel.ValPerDiv;
-                    double yPos = (channel.Position / 100.0 - 0.5) * 10 + value;
-                    series.Points.Add(new DataPoint(time, yPos));
-                }
-
-                ZoomPlotModel.Series.Add(series);
-            }
-
-            ZoomPlotModel.InvalidatePlot(true);
-        }
-
-        private void UpdateFftChart()
-        {
-            FftPlotModel.Series.Clear();
-
-            foreach (var kvp in _channelData)
-            {
-                if (kvp.Key >= ScopeValues.Count) continue;
-                var channel = ScopeValues[kvp.Key];
-                if (!channel.Visible) continue;
-                if (FftSource != "All" && channel.ChannelId != FftSource) continue;
-
-                var data = kvp.Value;
-                // Pad to power of 2
-                int n = 1;
-                while (n < data.Length) n <<= 1;
-
-                var complexData = new System.Numerics.Complex[n];
-                for (int i = 0; i < data.Length; i++)
-                {
-                    double windowVal = ApplyWindow(i, data.Length);
-                    complexData[i] = new System.Numerics.Complex(data[i] * windowVal, 0);
-                }
-
-                Fourier.Forward(complexData, FourierOptions.NoScaling);
-
-                double freqRes = 1.0 / (_currentSamplePeriod * n);
-                int halfN = n / 2;
-
-                var series = new LineSeries
-                {
-                    Color = OxyColor.FromArgb(channel.Color.A, channel.Color.R, channel.Color.G, channel.Color.B),
-                    StrokeThickness = 1.5
-                };
-
-                for (int i = 0; i < halfN; i++)
-                {
-                    double freq = i * freqRes;
-                    double magnitude = complexData[i].Magnitude / data.Length;
-                    if (FftScale == "Rms")
-                        magnitude *= Math.Sqrt(2);
-                    else if (FftScale == "dB")
-                        magnitude = 20 * Math.Log10(Math.Max(magnitude, 1e-10));
-
-                    series.Points.Add(new DataPoint(freq, magnitude));
-                }
-
-                FftPlotModel.Series.Add(series);
-            }
-
-            FftPlotModel.InvalidatePlot(true);
-        }
-
-        private double ApplyWindow(int index, int length)
-        {
-            return FftWindow switch
-            {
-                "Hann" => 0.5 * (1 - Math.Cos(2 * Math.PI * index / (length - 1))),
-                "Hamming" => 0.54 - 0.46 * Math.Cos(2 * Math.PI * index / (length - 1)),
-                "Blackman" => 0.42 - 0.5 * Math.Cos(2 * Math.PI * index / (length - 1)) +
-                              0.08 * Math.Cos(4 * Math.PI * index / (length - 1)),
-                "Rectangular" => 1.0,
-                _ => 0.5 * (1 - Math.Cos(2 * Math.PI * index / (length - 1)))
-            };
-        }
-
-        private void UpdateScopeValues(int channelIndex, double[] data)
-        {
-            if (channelIndex >= ScopeValues.Count || data.Length == 0) return;
-            var sv = ScopeValues[channelIndex];
-            sv.Min = data.Min();
-            sv.Max = data.Max();
-            sv.Average = data.Average();
-        }
-
-        private void ClearChartData()
-        {
-            _channelData.Clear();
-            MainPlotModel.Series.Clear();
-            MainPlotModel.InvalidatePlot(true);
-            ZoomPlotModel.Series.Clear();
-            ZoomPlotModel.InvalidatePlot(true);
-            FftPlotModel.Series.Clear();
-            FftPlotModel.InvalidatePlot(true);
-        }
-
-        private ChartDataFile CollectChartData()
-        {
-            var chartData = new ChartDataFile { SamplePeriod = _currentSamplePeriod };
-            foreach (var kvp in _channelData.OrderBy(k => k.Key))
-            {
-                var channel = kvp.Key < ScopeValues.Count ? ScopeValues[kvp.Key] : null;
-                chartData.Channels.Add(new Services.ChannelData
-                {
-                    Name = channel?.VariableName ?? $"CH{kvp.Key + 1}",
-                    Data = kvp.Value
-                });
-            }
-            return chartData;
-        }
-
-        private void ApplyChartData(ChartDataFile chartData)
-        {
-            _channelData.Clear();
-            _currentSamplePeriod = chartData.SamplePeriod;
-            for (int i = 0; i < chartData.Channels.Count; i++)
-            {
-                _channelData[i] = chartData.Channels[i].Data;
-                if (i < ScopeValues.Count)
-                {
-                    ScopeValues[i].VariableName = chartData.Channels[i].Name;
-                    ScopeValues[i].Visible = true;
-                }
-            }
-            UpdateMainChart();
-            UpdateZoomChart();
-            if (FftEnabled) UpdateFftChart();
-        }
-
-        private void AutoSaveChartData()
-        {
-            try
-            {
-                string dir = Path.GetDirectoryName(_currentProjectPath) ?? Environment.CurrentDirectory;
-                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                string path = Path.Combine(dir, $"autosave_{timestamp}.dtlcd");
-                var chartData = CollectChartData();
-                ProjectFileService.SaveChartData(path, chartData);
-                ProjectFileService.SaveChartDataCsv(path + ".csv", chartData);
-            }
-            catch { }
-        }
-
-        private void CollectSettings()
-        {
-            Settings.Time = new TimeSettings
-            {
-                Mode = TimeMode,
-                SecPerDiv = SecPerDiv,
-                SamplePeriod = SamplePeriod,
-                RecordLength = RecordLength
-            };
-            Settings.Trigger = new TriggerSettings
-            {
-                Position = TriggerPosition,
-                Level = TriggerLevel,
-                Source = TriggerSource,
-                Mode = TriggerMode,
-                Edge = TriggerEdge
-            };
-            Settings.Zoom = new ZoomSettings
-            {
-                CursorEnabled = ZoomCursorEnabled,
-                SecPerDiv = ZoomSecPerDiv,
-                Position = ZoomPosition
-            };
-            Settings.Cursor = new CursorSettings
-            {
-                CursorX1 = CursorX1Enabled,
-                CursorX2 = CursorX2Enabled,
-                CursorY1 = CursorY1Enabled,
-                CursorY2 = CursorY2Enabled
-            };
-            Settings.Fft = new FftSettings
-            {
-                Enabled = FftEnabled,
-                Source = FftSource,
-                Scope = FftScope,
-                Window = FftWindow,
-                Scale = FftScale
-            };
-            Settings.Save = new SaveSettings { AutoSave = AutoSaveEnabled };
-            Settings.Communication = new CommunicationSettings
-            {
-                PortName = SelectedPort,
-                BaudRate = Settings.Communication.BaudRate,
-                BaseClockMHz = Settings.Communication.BaseClockMHz
-            };
-
-            Settings.Channels.Clear();
-            foreach (var sv in ScopeValues)
-            {
-                Settings.Channels.Add(new ChannelSettings
-                {
-                    ChannelId = sv.ChannelId,
-                    VariableName = sv.VariableName,
-                    ValPerDiv = sv.ValPerDiv,
-                    Position = sv.Position,
-                    Offset = sv.Offset,
-                    Visible = sv.Visible,
-                    Color = sv.Color
-                });
-            }
-        }
-
-        private void ApplySettings(ProjectSettings settings)
-        {
-            settings.Communication ??= new CommunicationSettings();
-
-            TimeMode = settings.Time.Mode;
-            SecPerDiv = settings.Time.SecPerDiv;
-            SamplePeriod = settings.Time.SamplePeriod;
-            RecordLength = settings.Time.RecordLength;
-
-            TriggerPosition = settings.Trigger.Position;
-            TriggerLevel = settings.Trigger.Level;
-            TriggerSource = settings.Trigger.Source;
-            TriggerMode = settings.Trigger.Mode;
-            TriggerEdge = settings.Trigger.Edge;
-
-            ZoomCursorEnabled = settings.Zoom.CursorEnabled;
-            ZoomSecPerDiv = settings.Zoom.SecPerDiv;
-            ZoomPosition = settings.Zoom.Position;
-
-            CursorX1Enabled = settings.Cursor.CursorX1;
-            CursorX2Enabled = settings.Cursor.CursorX2;
-            CursorY1Enabled = settings.Cursor.CursorY1;
-            CursorY2Enabled = settings.Cursor.CursorY2;
-
-            FftEnabled = settings.Fft.Enabled;
-            FftSource = settings.Fft.Source;
-            FftScope = settings.Fft.Scope;
-            FftWindow = settings.Fft.Window;
-            FftScale = settings.Fft.Scale;
-
-            AutoSaveEnabled = settings.Save.AutoSave;
-            SelectedPort = settings.Communication.PortName;
-
-            for (int i = 0; i < settings.Channels.Count && i < ScopeValues.Count; i++)
-            {
-                var ch = settings.Channels[i];
-                ScopeValues[i].VariableName = ch.VariableName;
-                ScopeValues[i].ValPerDiv = ch.ValPerDiv;
-                ScopeValues[i].Position = ch.Position;
-                ScopeValues[i].Offset = ch.Offset;
-                ScopeValues[i].Visible = ch.Visible;
-                ScopeValues[i].Color = ch.Color;
-            }
-
-            if (!string.IsNullOrEmpty(settings.VariableFilePath) && File.Exists(settings.VariableFilePath))
-            {
-                LoadVariableFile(settings.VariableFilePath);
-            }
-
-            UpdateSerialLocalStatus();
-        }
-
-        private void RebuildVariableNameList()
-        {
-            VariableNames.Clear();
-            var unique = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var variable in _icsService.Variables)
-            {
-                if (unique.Add(variable.DisplayName))
-                {
-                    VariableNames.Add(variable.DisplayName);
-                }
-            }
-        }
+        // ---- Variable Settings ----
 
         public List<VariableInfo> GetVariableSettingsCopy()
         {
-            return _icsService.Variables.Select(v => v.Clone()).ToList();
+            return _session.IcsService.Variables.Select(v => v.Clone()).ToList();
         }
 
         public void ApplyVariableSettings(IEnumerable<VariableInfo> editedVariables)
@@ -945,7 +255,7 @@ namespace MCUScope.ViewModels
 
             var renameMap = new Dictionary<string, string>(StringComparer.Ordinal);
 
-            foreach (var variable in _icsService.Variables)
+            foreach (var variable in _session.IcsService.Variables)
             {
                 string key = $"{variable.Name}@{variable.Address:X8}";
                 if (!editedMap.TryGetValue(key, out var edited)) continue;
@@ -960,170 +270,43 @@ namespace MCUScope.ViewModels
 
                 string newDisplay = variable.DisplayName;
                 if (!string.Equals(oldDisplay, newDisplay, StringComparison.Ordinal))
-                {
                     renameMap[oldDisplay] = newDisplay;
-                }
             }
 
-            foreach (var watch in WatchItems)
+            foreach (var watch in Watch.WatchItems)
             {
                 if (!string.IsNullOrEmpty(watch.Name) && renameMap.TryGetValue(watch.Name, out var renamed))
-                {
                     watch.Name = renamed;
-                }
             }
 
-            foreach (var channel in ScopeValues)
-            {
-                if (!string.IsNullOrEmpty(channel.VariableName) &&
-                    renameMap.TryGetValue(channel.VariableName, out var renamed))
-                {
-                    channel.VariableName = renamed;
-                }
-            }
-
-            RebuildVariableNameList();
-        }
-
-        private int ResolveBaudRate()
-        {
-            int baudRate = Settings.Communication.BaudRate > 0
-                ? Settings.Communication.BaudRate
-                : (int)Math.Round(Settings.Communication.BaseClockMHz * 1_000_000 / 8.0);
-
-            if (baudRate <= 0)
-            {
-                baudRate = 1_000_000;
-            }
-
-            return baudRate;
-        }
-
-        private async Task AutoReadLoopAsync(int intervalUs, CancellationToken token)
-        {
-            long intervalTicks = Math.Max(1L,
-                (long)Math.Round(intervalUs * (double)Stopwatch.Frequency / 1_000_000d));
-            var stopwatch = Stopwatch.StartNew();
-            long nextTick = stopwatch.ElapsedTicks;
-
-            try
-            {
-                while (!token.IsCancellationRequested)
-                {
-                    if (stopwatch.ElapsedTicks >= nextTick)
-                    {
-                        if (Application.Current != null)
-                        {
-                            await Application.Current.Dispatcher.InvokeAsync(ReadWatchVariables);
-                        }
-
-                        nextTick += intervalTicks;
-                        if (stopwatch.ElapsedTicks > nextTick + intervalTicks * 4)
-                        {
-                            nextTick = stopwatch.ElapsedTicks + intervalTicks;
-                        }
-
-                        continue;
-                    }
-
-                    long remainTicks = nextTick - stopwatch.ElapsedTicks;
-                    double remainMs = remainTicks * 1000.0 / Stopwatch.Frequency;
-
-                    if (remainMs >= 1.0)
-                    {
-                        await Task.Delay(1, token);
-                    }
-                    else
-                    {
-                        Thread.SpinWait(120);
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                // Normal stop path.
-            }
-        }
-
-        private void StartAutoReadLoop()
-        {
-            StopAutoReadLoop();
-
-            AutoReadIntervalUs = Math.Clamp(AutoReadIntervalUs, 1, 10_000_000);
-            _autoReadCts = new CancellationTokenSource();
-            IsAutoReading = true;
-            _autoReadTask = Task.Run(() => AutoReadLoopAsync(AutoReadIntervalUs, _autoReadCts.Token));
-        }
-
-        private void StopAutoReadLoop()
-        {
-            if (_autoReadCts != null)
-            {
-                _autoReadCts.Cancel();
-                _autoReadCts.Dispose();
-                _autoReadCts = null;
-            }
-
-            _autoReadTask = null;
-            IsAutoReading = false;
-        }
-
-        private void UpdateSerialLocalStatus()
-        {
-            string port = _serialService.IsOpen ? _serialService.PortName :
-                (string.IsNullOrWhiteSpace(SelectedPort) ? "-" : SelectedPort);
-            int baudRate = ResolveBaudRate();
-            string localState = _serialService.IsOpen ? "Open" : "Disconnected";
-            string remoteState = ConnectionStatus switch
-            {
-                ConnectionStatus.Connected => "MCU: Connected",
-                ConnectionStatus.IcsUnitOnly => "MCU: Waiting Info",
-                _ => "MCU: Disconnected"
-            };
-            SerialLocalStatusText = $"Port: {port}, Baud: {baudRate}, Local: {localState}, {remoteState}";
+            Scope.ApplyVariableRenames(renameMap);
+            _session.RebuildVariableNameList();
         }
 
         public void NotifyCommunicationSettingsChanged()
         {
-            UpdateSerialLocalStatus();
+            Communication.UpdateSerialLocalStatus();
         }
 
-        public static string FormatTime(double seconds)
-        {
-            if (seconds >= 1) return $"{seconds:G4}s";
-            if (seconds >= 0.001) return $"{seconds * 1000:G4}ms";
-            if (seconds >= 0.000001) return $"{seconds * 1000000:G4}us";
-            return $"{seconds * 1000000000:G4}ns";
-        }
+        // ---- Settings Apply ----
 
-        partial void OnSecPerDivChanged(double value)
+        private void ApplySettings(ProjectSettings settings)
         {
-            RecordLength = (int)(SecPerDiv * 10 / SamplePeriod) + 1;
-        }
+            settings.Communication ??= new CommunicationSettings();
 
-        partial void OnSamplePeriodChanged(double value)
-        {
-            RecordLength = (int)(SecPerDiv * 10 / SamplePeriod) + 1;
-        }
+            Scope.ApplySettings(settings);
+            Communication.SelectedPort = settings.Communication.PortName;
 
-        partial void OnSelectedPortChanged(string value)
-        {
-            UpdateSerialLocalStatus();
-        }
+            if (!string.IsNullOrEmpty(settings.VariableFilePath) && File.Exists(settings.VariableFilePath))
+                _ = LoadVariableFileAsync(settings.VariableFilePath);
 
-        partial void OnAutoReadIntervalUsChanged(int value)
-        {
-            if (value < 1)
-            {
-                AutoReadIntervalUs = 1;
-            }
+            Communication.UpdateSerialLocalStatus();
         }
 
         public void Dispose()
         {
-            StopAutoReadLoop();
-            _icsService.Dispose();
-            _serialService.Dispose();
+            Watch.StopAutoReadLoop();
+            _session.Dispose();
         }
     }
 }

@@ -81,6 +81,17 @@ Scope and watch variables are currently backed by simulation globals:
 - `com_f4_speed_rate_limit_rpm`
 - `g_st_sensorless_vector.*` selected fields
 
+GUI behavior updates for STM32/RX mixed map use:
+- Variable name dropdowns (Watch/Scope) now keep only protocol-scalar and non-internal symbols.
+- Non-scalar/internal symbols are blocked from scope/watch requests to avoid repetitive NACK storms.
+- Variable Browser supports drag-drop to scope channel table.
+
+Automated end-to-end debug command:
+`python tools/auto_debug_stm32.py --port COM7 --baud 2000000 --skip-build`
+
+Complete automated debug and GUI validation procedure:
+`docs/GUI_AUTO_DEBUG_PLAN.md`
+
 ## Known Limits (Current Stage)
 
 - Scope still has up to 12 GUI slots, but each slot can now bind any variable loaded from map/sym/csv/xml.

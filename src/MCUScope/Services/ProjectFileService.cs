@@ -39,28 +39,35 @@ namespace MCUScope.Services
         public static void SaveChartDataCsv(string csvPath, ChartDataFile chartData)
         {
             using var writer = new StreamWriter(csvPath);
-            // Header: Time, CH1, CH2, ...
+            // Header: Time, channel names
             writer.Write("Time");
             for (int i = 0; i < chartData.ChannelCount; i++)
-                writer.Write($",CH{i + 1}");
+            {
+                string name = !string.IsNullOrEmpty(chartData.Channels[i].Name)
+                    ? chartData.Channels[i].Name : $"CH{i + 1}";
+                writer.Write($",{name}");
+            }
             writer.WriteLine();
 
-            // Data rows
-            if (chartData.ChannelCount > 0 && chartData.Channels[0].Data.Length > 0)
+            // Find max data length across all channels
+            int maxLength = 0;
+            for (int c = 0; c < chartData.ChannelCount; c++)
+                maxLength = System.Math.Max(maxLength, chartData.Channels[c].Data.Length);
+
+            // Data rows - pad shorter channels with NaN
+            for (int s = 0; s < maxLength; s++)
             {
-                int length = chartData.Channels[0].Data.Length;
-                for (int s = 0; s < length; s++)
+                double time = s * chartData.SamplePeriod;
+                writer.Write(time.ToString("G"));
+                for (int c = 0; c < chartData.ChannelCount; c++)
                 {
-                    double time = s * chartData.SamplePeriod;
-                    writer.Write(time.ToString("G"));
-                    for (int c = 0; c < chartData.ChannelCount; c++)
-                    {
-                        writer.Write(",");
-                        if (s < chartData.Channels[c].Data.Length)
-                            writer.Write(chartData.Channels[c].Data[s].ToString("G"));
-                    }
-                    writer.WriteLine();
+                    writer.Write(",");
+                    if (s < chartData.Channels[c].Data.Length)
+                        writer.Write(chartData.Channels[c].Data[s].ToString("G"));
+                    else
+                        writer.Write("NaN");
                 }
+                writer.WriteLine();
             }
         }
     }
