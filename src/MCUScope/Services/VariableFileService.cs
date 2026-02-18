@@ -73,85 +73,273 @@ namespace MCUScope.Services
             return variables;
         }
 
+        // Cached compiled regex for Renesas MAP format
+        // Symbol name line: leading spaces + underscore + name (may contain dots for struct members)
+        private static readonly Regex SymbolNameRx = new(
+            @"^\s+_([A-Za-z][\w.]*)\s*$", RegexOptions.Compiled);
+
+        // Metadata line for globals/locals: address(8hex) size(hex) "data" ,scope(g/l)
+        private static readonly Regex DataMetaRx = new(
+            @"^\s*([0-9A-Fa-f]{8})\s+([0-9A-Fa-f]+)\s+data\s+,([gl])\s+",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        // Metadata line for struct members with explicit type: address(8hex) size(hex) type_string
+        private static readonly Regex TypedMetaRx = new(
+            @"^\s*([0-9A-Fa-f]{8})\s+([0-9A-Fa-f]+)\s+(float|double|unsigned\s+\w+|signed\s+\w+|char|short|int|long)\s*$",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        // Fallback generic pattern
+        private static readonly Regex GenericMapRx = new(
+            @"^\s*([0-9a-fA-F]{4,8})\s+(_?\w+)\s+([0-9a-fA-F]+)",
+            RegexOptions.Compiled | RegexOptions.Multiline);
+
+        // Keil/ARM map execution-region row:
+        // 0x2000000c   0x08005c64   0x00000004   Data   RW   25   .data.com_f4_speed_rate_limit_rpm  main.o
+        private static readonly Regex KeilExecRowRx = new(
+            @"^\s*0x([0-9A-Fa-f]{8})\s+(?:0x[0-9A-Fa-f]{8}|-)\s+0x([0-9A-Fa-f]+)\s+\w+\s+\w+\s+\d+\s+(\S+)\s+\S+\s*$",
+            RegexOptions.Compiled);
+
         private static List<VariableInfo> LoadMapFormat(string filePath)
         {
             var variables = new List<VariableInfo>();
             var lines = File.ReadAllLines(filePath);
-            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var seen = new HashSet<(string, uint)>();
 
-            // Renesas map format (symbol on one line + metadata on next line).
-            var symbolNamePattern = new Regex(@"^\s+_([A-Za-z]\w*)\s*$");
-            var symbolMetaPattern = new Regex(@"^\s*([0-9A-Fa-f]{8})\s+([0-9A-Fa-f]+)\s+data\s+,([gl])\s+", RegexOptions.IgnoreCase);
+            int globalCount = 0, localCount = 0, structCount = 0;
+            int keilCount = 0;
 
+            // 1) Renesas CCRX symbol-list style parser.
             for (int i = 0; i < lines.Length; i++)
             {
-                var symbolMatch = symbolNamePattern.Match(lines[i]);
+                var symbolMatch = SymbolNameRx.Match(lines[i]);
                 if (!symbolMatch.Success) continue;
 
                 string symbolName = symbolMatch.Groups[1].Value;
                 if (symbolName.StartsWith("__", StringComparison.Ordinal)) continue;
 
-                // Search next few lines for matching metadata entry.
+                bool isStructMember = symbolName.Contains('.');
+
+                // Search next few lines for metadata
                 for (int j = i + 1; j < Math.Min(i + 6, lines.Length); j++)
                 {
-                    var meta = symbolMetaPattern.Match(lines[j]);
-                    if (!meta.Success) continue;
-
-                    // Keep globals by default. Local/static symbols make the list noisy.
-                    if (!string.Equals(meta.Groups[3].Value, "g", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    uint address = ParseAddress(meta.Groups[1].Value);
-                    if (!int.TryParse(meta.Groups[2].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var size))
-                        continue;
-
-                    if (size <= 0)
-                        continue;
-
-                    string dedupKey = $"{symbolName}@{address:X8}";
-                    if (!seen.Add(dedupKey))
-                        continue;
-
-                    var type = SizeToType(size);
-                    variables.Add(new VariableInfo
+                    // Try "data ,g/l" format first (globals and locals)
+                    var dataMeta = DataMetaRx.Match(lines[j]);
+                    if (dataMeta.Success)
                     {
-                        Name = symbolName,
-                        Address = address,
-                        OriginalType = type,
-                        ModifiedType = type
-                    });
-                    break;
+                        uint address = ParseAddress(dataMeta.Groups[1].Value);
+                        if (!int.TryParse(dataMeta.Groups[2].Value, NumberStyles.HexNumber,
+                            CultureInfo.InvariantCulture, out var size) || size <= 0)
+                            break;
+
+                        if (!seen.Add((symbolName, address))) break;
+
+                        bool isGlobal = string.Equals(dataMeta.Groups[3].Value, "g",
+                            StringComparison.OrdinalIgnoreCase);
+
+                        // Use naming convention for type inference, fall back to size
+                        var type = InferTypeFromName(symbolName) ?? SizeToType(size);
+                        string category = CategorizeVariable(symbolName);
+
+                        variables.Add(new VariableInfo
+                        {
+                            Name = symbolName,
+                            Address = address,
+                            OriginalType = type,
+                            ModifiedType = type,
+                            IsGlobal = isGlobal,
+                            Category = category
+                        });
+
+                        if (isGlobal) globalCount++; else localCount++;
+                        break;
+                    }
+
+                    // Try typed format (struct members: "00006848   4   float")
+                    var typedMeta = TypedMetaRx.Match(lines[j]);
+                    if (typedMeta.Success)
+                    {
+                        uint address = ParseAddress(typedMeta.Groups[1].Value);
+                        if (!int.TryParse(typedMeta.Groups[2].Value, NumberStyles.HexNumber,
+                            CultureInfo.InvariantCulture, out var size) || size <= 0)
+                            break;
+
+                        if (!seen.Add((symbolName, address))) break;
+
+                        // Use explicit type string from MAP
+                        string typeStr = typedMeta.Groups[3].Value.Trim();
+                        var type = ParseVariableType(typeStr);
+                        string category = CategorizeVariable(symbolName);
+
+                        variables.Add(new VariableInfo
+                        {
+                            Name = symbolName,
+                            Address = address,
+                            OriginalType = type,
+                            ModifiedType = type,
+                            IsGlobal = false, // struct members are not independently global
+                            Category = category
+                        });
+
+                        structCount++;
+                        break;
+                    }
                 }
             }
 
-            if (variables.Count > 0)
+            // 2) Keil/ARM execution-region table parser (STM32 maps).
+            foreach (var line in lines)
             {
-                return variables;
+                var keil = KeilExecRowRx.Match(line);
+                if (!keil.Success) continue;
+
+                uint address = ParseAddress(keil.Groups[1].Value);
+                if (!int.TryParse(keil.Groups[2].Value, NumberStyles.HexNumber,
+                    CultureInfo.InvariantCulture, out var size) || size <= 0)
+                    continue;
+
+                // Keep RAM variables only.
+                if (address < 0x20000000U || address >= 0x60000000U)
+                    continue;
+
+                string sectionName = keil.Groups[3].Value;
+                if (!TryExtractKeilVariableName(sectionName, out var symbolName))
+                    continue;
+
+                if (!seen.Add((symbolName, address)))
+                    continue;
+
+                var type = InferTypeFromName(symbolName) ?? SizeToType(size);
+                variables.Add(new VariableInfo
+                {
+                    Name = symbolName,
+                    Address = address,
+                    OriginalType = type,
+                    ModifiedType = type,
+                    IsGlobal = true,
+                    Category = CategorizeVariable(symbolName)
+                });
+                keilCount++;
             }
 
-            // Fallback parser for simpler generic map formats.
-            var content = File.ReadAllText(filePath);
-            var genericPattern = new Regex(@"^[\s]*([0-9a-fA-F]{4,8})[\s]+(_?\w+)[\s]+([0-9a-fA-F]+)",
-                RegexOptions.Multiline);
+            LogService.Info($"MAP loaded: {globalCount} globals, {structCount} struct members, " +
+                $"{localCount} locals, {keilCount} keil = {variables.Count} total from {Path.GetFileName(filePath)}");
 
-            foreach (Match match in genericPattern.Matches(content))
+            if (variables.Count > 0)
+                return variables;
+
+            // Fallback for simpler generic map formats (reuse lines, no re-read)
+            string content = string.Join("\n", lines);
+            foreach (Match match in GenericMapRx.Matches(content))
             {
                 uint address = ParseAddress(match.Groups[1].Value);
                 string name = match.Groups[2].Value;
                 if (name.StartsWith("__", StringComparison.Ordinal)) continue;
-                if (!int.TryParse(match.Groups[3].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var size)) continue;
-                if (size <= 0) continue;
+                if (!int.TryParse(match.Groups[3].Value, NumberStyles.HexNumber,
+                    CultureInfo.InvariantCulture, out var size) || size <= 0) continue;
 
+                // Strip single leading underscore only
+                if (name.StartsWith("_") && !name.StartsWith("__"))
+                    name = name[1..];
+
+                if (!seen.Add((name, address))) continue;
+
+                var type = InferTypeFromName(name) ?? SizeToType(size);
                 variables.Add(new VariableInfo
                 {
-                    Name = name.TrimStart('_'),
+                    Name = name,
                     Address = address,
-                    OriginalType = SizeToType(size),
-                    ModifiedType = SizeToType(size)
+                    OriginalType = type,
+                    ModifiedType = type,
+                    Category = CategorizeVariable(name)
                 });
             }
 
+            LogService.Info($"MAP fallback: {variables.Count} variables from {Path.GetFileName(filePath)}");
             return variables;
+        }
+
+        private static bool TryExtractKeilVariableName(string sectionName, out string symbolName)
+        {
+            symbolName = string.Empty;
+            if (string.IsNullOrWhiteSpace(sectionName))
+                return false;
+
+            string[] prefixes = { ".data.", ".bss.", ".noinit.", ".zidata." };
+            string candidate = sectionName;
+            foreach (var prefix in prefixes)
+            {
+                if (candidate.StartsWith(prefix, StringComparison.Ordinal))
+                {
+                    candidate = candidate[prefix.Length..];
+                    break;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(candidate))
+                return false;
+            if (candidate.StartsWith(".", StringComparison.Ordinal)) // linker internals like .L_MergedGlobals
+                return false;
+            if (candidate.Equals("HEAP", StringComparison.OrdinalIgnoreCase) ||
+                candidate.Equals("STACK", StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (candidate.StartsWith("Region$$", StringComparison.Ordinal))
+                return false;
+
+            symbolName = candidate;
+            return true;
+        }
+
+        /// <summary>
+        /// Infer variable type from Renesas naming convention.
+        /// com_f4_ = float32, com_u1_ = uint8, com_u2_ = uint16, com_s2_ = int16, etc.
+        /// Also handles g_ prefixed: g_f4_ = float, g_u1_ = uint8, etc.
+        /// </summary>
+        private static VariableType? InferTypeFromName(string name)
+        {
+            // Check for type markers in the name segments (split by _ or .)
+            string lower = name.ToLowerInvariant();
+
+            // Pattern: prefix_f4_ or .f4_ = float32
+            if (lower.Contains("_f4_") || lower.Contains(".f4_") || lower.Contains("_f4."))
+                return VariableType.Float32;
+            if (lower.Contains("_u4_") || lower.Contains(".u4_"))
+                return VariableType.UInt32;
+            if (lower.Contains("_s4_") || lower.Contains(".s4_"))
+                return VariableType.Int32;
+            if (lower.Contains("_u2_") || lower.Contains(".u2_"))
+                return VariableType.UInt16;
+            if (lower.Contains("_s2_") || lower.Contains(".s2_"))
+                return VariableType.Int16;
+            if (lower.Contains("_u1_") || lower.Contains(".u1_"))
+                return VariableType.UInt8;
+            if (lower.Contains("_s1_") || lower.Contains(".s1_"))
+                return VariableType.Int8;
+
+            // Also check suffix patterns like f4_varname
+            if (lower.StartsWith("f4_")) return VariableType.Float32;
+            if (lower.StartsWith("u1_")) return VariableType.UInt8;
+            if (lower.StartsWith("u2_")) return VariableType.UInt16;
+            if (lower.StartsWith("u4_")) return VariableType.UInt32;
+            if (lower.StartsWith("s1_")) return VariableType.Int8;
+            if (lower.StartsWith("s2_")) return VariableType.Int16;
+            if (lower.StartsWith("s4_")) return VariableType.Int32;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Categorize variable by naming convention for filtering.
+        /// </summary>
+        private static string CategorizeVariable(string name)
+        {
+            if (name.Contains('.')) return "Struct";
+            string lower = name.ToLowerInvariant();
+            if (lower.StartsWith("com_")) return "COM";
+            if (lower.StartsWith("g_st_")) return "Struct";
+            if (lower.StartsWith("g_")) return "Global";
+            if (lower.StartsWith("bsp_")) return "BSP";
+            if (lower.StartsWith("r_")) return "Driver";
+            return "Other";
         }
 
         private static List<VariableInfo> LoadSymFormat(string filePath)
@@ -259,9 +447,9 @@ namespace MCUScope.Services
         private static VariableType SizeToType(int byteSize) => byteSize switch
         {
             1 => VariableType.UInt8,
-            2 => VariableType.Int16,
-            4 => VariableType.Int32,
-            _ => VariableType.Int32
+            2 => VariableType.UInt16,
+            4 => VariableType.Float32, // Most MCU 4-byte vars are float in motor control
+            _ => VariableType.UInt32
         };
 
         public static void SaveVariableFile(string filePath, List<VariableInfo> variables)

@@ -1,6 +1,23 @@
 # DEV_LOG.md
 
 ## 2026-02-18
+Summary: Added dual MAP compatibility for STM32 Keil/ARM and RX CCRX variable parsing.
+Files: src/MCUScope/Services/VariableFileService.cs, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- Enhanced `LoadMapFormat` to parse two concrete map families in one flow:
+  - Renesas RX CCRX symbol-list style (existing logic retained).
+  - STM32 Keil/ARM execution-region table style (new logic added).
+- Added Keil row parser for execution-region lines and extracted RAM variables from section names such as:
+  - `.data.<symbol>`
+  - `.bss.<symbol>`
+  - `.noinit.<symbol>`
+  - `.zidata.<symbol>`
+- Added filtering for linker/internal pseudo-symbols (`.L_*`, `Region$$*`, `HEAP`, `STACK`) and merged all parsed results by `(name,address)` dedup set.
+- Updated MAP load log to include Keil parsed count for easier source-format diagnostics.
+Tests:
+- `dotnet build MCUScope.sln` executed; blocked by file lock on running process `MCUScope.exe` (`MSB3021/MSB3027`), so full build verification not completed in this run.
+
+## 2026-02-18
 Summary: Started STM32 G431 execution by implementing repository UART protocol handling and simulated motor-state variable updates for GUI joint debug.
 Files: Reference/G431_KEIL_Sample/Core/Inc/motor_sim_vars.h, Reference/G431_KEIL_Sample/Core/Inc/usart.h, Reference/G431_KEIL_Sample/Core/Src/main.c, Reference/G431_KEIL_Sample/Core/Src/usart.c, docs/USAGE.md, docs/TESTING.md, docs/CHANGELOG.md, docs/DEV_LOG.md.
 Behavior:

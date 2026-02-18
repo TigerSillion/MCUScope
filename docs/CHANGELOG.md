@@ -1,6 +1,8 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Extended `VariableFileService.LoadMapFormat` to support both RX CCRX map format and STM32 Keil/ARM map execution-region format in the same parser path.
+- Added Keil RAM-section variable extraction (`.data.*`, `.bss.*`, `.noinit.*`, `.zidata.*`) with linker-internal symbol filtering and dedup merge with existing CCRX results.
 - Added first STM32 protocol integration in `Reference/G431_KEIL_Sample` to support repository UART commands (`GetInfo/ReadVariable/WriteVariable/StartScope/StopScope/SetTrigger`) at `2000000` bps via `LPUART1`.
 - Added STM32-side simulated motor-state globals (`com_*`, `g_u1_system_mode`, `g_st_sensorless_vector.*`) and periodic update loop in `Core/Src/main.c` for GUI watch/scope joint debug without a real motor board.
 - Added STM32 integration notes and smoke-test commands to `docs/USAGE.md` and `docs/TESTING.md`.
