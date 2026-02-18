@@ -56,6 +56,31 @@ Current default UART config in firmware:
 - BRR: `4` with BGDM+ABCS enabled (about 1 Mbps when PCLKB is 40 MHz)
 - Interrupt level: `4`
 
+## STM32 G431 Integration (Work In Progress)
+
+- STM32 reference project path:
+`Reference/G431_KEIL_Sample`
+- Current STM32 UART path:
+`LPUART1` on `PA2/PA3`, DMA RX/TX enabled, `2000000` bps.
+- Firmware protocol mode:
+`USE_ICS2_PROTOCOL=1` in
+`Reference/G431_KEIL_Sample/Core/Src/usart.c`
+
+Implemented command path (STM32):
+- `GetInfo (0x02)`
+- `ReadVariable (0x10)`
+- `WriteVariable (0x11)`
+- `StartScope (0x20)`
+- `StopScope (0x21)`
+- `SetTrigger (0x24)` (stored, no trigger decision logic yet)
+
+Scope and watch variables are currently backed by simulation globals:
+- `com_u1_system_mode`
+- `g_u1_system_mode`
+- `com_f4_ref_speed_rpm`
+- `com_f4_speed_rate_limit_rpm`
+- `g_st_sensorless_vector.*` selected fields
+
 ## Known Limits (Current Stage)
 
 - Scope still has up to 12 GUI slots, but each slot can now bind any variable loaded from map/sym/csv/xml.

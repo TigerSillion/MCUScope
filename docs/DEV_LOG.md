@@ -1,5 +1,36 @@
 # DEV_LOG.md
 
+## 2026-02-18
+Summary: Started STM32 G431 execution by implementing repository UART protocol handling and simulated motor-state variable updates for GUI joint debug.
+Files: Reference/G431_KEIL_Sample/Core/Inc/motor_sim_vars.h, Reference/G431_KEIL_Sample/Core/Inc/usart.h, Reference/G431_KEIL_Sample/Core/Src/main.c, Reference/G431_KEIL_Sample/Core/Src/usart.c, docs/USAGE.md, docs/TESTING.md, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- Added shared simulation-global declarations in `motor_sim_vars.h` to expose command/status/sensorless debug variables with stable symbol addresses.
+- Extended `main.c` with deterministic simulated motor-state updates driven by `com_u1_system_mode`, `com_f4_ref_speed_rpm`, and `com_f4_speed_rate_limit_rpm`.
+- Added continuous update for key debug outputs under `g_st_sensorless_vector` (`vdc`, phase currents, speed/current outputs, state-machine status) and integrated this update in the main loop.
+- Added `ICS2_ProtocolPoll()` call in main loop to support scope sampling/streaming scheduling.
+- Reworked STM32 `LPUART1` user code path in `usart.c` to support repository protocol (`0xAA 0x55` + sum checksum) with:
+  - frame parser and dispatch,
+  - `GetInfo`, variable read/write, scope start/stop, trigger set handlers,
+  - whitelist-based variable access table,
+  - waveform packet generation (`WaveformData 0x84`),
+  - ACK/NACK responses.
+- Kept protocol path switchable through `USE_ICS2_PROTOCOL` compile-time flag; set to `1` by default for MCUScope GUI linkage.
+- Increased UART TX queue frame limit to `768` bytes to fit scope packets at moderate record lengths.
+- Updated `docs/USAGE.md` and `docs/TESTING.md` with STM32 integration and live smoke command templates at `2000000` bps.
+Tests:
+- Not run (local Keil/board flash and live serial validation pending in this workspace).
+
+## 2026-02-18
+Summary: Added a detailed STM32 G431 execution plan for RX26T algorithm porting, simulated motor-state updates, and GUI joint debug.
+Files: docs/STM32_G431_RX26T_PORTING_PLAN.md, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- Added a repository-local plan document tailored to `Reference/G431_KEIL_Sample` current baseline (`LPUART1 + DMA`, `2000000` bps, SerialDriver callback flow).
+- Documented protocol-gap handling between STM32 sample SerialDriver framing and repository GUI protocol in `docs/UART_PROTOCOL.md`, including a staged migration strategy.
+- Defined phased execution details for: protocol alignment, RX26T algorithm portability layer, simulated motor plant/state machine, global variable update contracts, scope streaming, and GUI joint-debug acceptance.
+- Included concrete file-level touch points, validation commands, risk controls, milestone estimates, and Definition of Done criteria.
+Tests:
+- Not run (documentation-only change).
+
 ## 2026-02-16
 Summary: Fixed GUI variable loading/visibility issues and completed requested UX upgrades (serial local status, arbitrary baud, Chinese help menu, microsecond auto-read).
 Files: src/MCUScope/Services/VariableFileService.cs, src/MCUScope/ViewModels/MainViewModel.cs, src/MCUScope/Views/MainWindow.xaml, src/MCUScope/Views/MainWindow.xaml.cs, src/MCUScope/Dialogs/CommunicationSettingsDialog.xaml, src/MCUScope/Dialogs/CommunicationSettingsDialog.xaml.cs, src/MCUScope/Dialogs/VariableSettingsDialog.xaml.cs, docs/GUI_OPERATION_MANUAL_CN.md, docs/CHANGELOG.md, docs/DEV_LOG.md.

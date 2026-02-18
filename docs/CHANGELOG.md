@@ -1,6 +1,10 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Added first STM32 protocol integration in `Reference/G431_KEIL_Sample` to support repository UART commands (`GetInfo/ReadVariable/WriteVariable/StartScope/StopScope/SetTrigger`) at `2000000` bps via `LPUART1`.
+- Added STM32-side simulated motor-state globals (`com_*`, `g_u1_system_mode`, `g_st_sensorless_vector.*`) and periodic update loop in `Core/Src/main.c` for GUI watch/scope joint debug without a real motor board.
+- Added STM32 integration notes and smoke-test commands to `docs/USAGE.md` and `docs/TESTING.md`.
+- Added `docs/STM32_G431_RX26T_PORTING_PLAN.md` with a detailed execution plan for porting RX26T algorithm modules to `Reference/G431_KEIL_Sample`, adding STM32-side motor-state simulation, and completing GUI joint-debug at `2000000` bps.
 - Fixed MAP loading flow for Renesas linker map files by adding a dedicated symbol-list parser and fallback parser in `VariableFileService`, so variable lists populate after `.map` import.
 - Fixed `Variables Settings` dialog to edit real variable metadata (type/scale/RW/alias/comment) and apply changes back to runtime variable definitions.
 - Added serial local status display (`Port/Baud/Local/MCU`) to the status bar and refreshed it on port refresh/select/connect/disconnect/communication setting updates.

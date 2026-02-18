@@ -77,6 +77,23 @@ Run from repository root:
 - `StartScope`
 - `StopScope`
 
+## STM32 G431 Live Smoke (2000000 bps)
+
+Example commands for `Reference/G431_KEIL_Sample` firmware:
+
+1. GetInfo + read:
+`python tools/uart_smoke.py --port COM5 --baud 2000000 --read-var com_u1_system_mode:0xADDR:u8`
+
+2. Write speed command + read back:
+`python tools/uart_smoke.py --port COM5 --baud 2000000 --write-var com_f4_ref_speed_rpm:0xADDR:f32:900 --read-var com_f4_ref_speed_rpm:0xADDR:f32`
+
+3. Scope two float channels:
+`python tools/uart_smoke.py --port COM5 --baud 2000000 --scope --scope-var 0:0xADDR:f32 --scope-var 1:0xADDR:f32`
+
+Notes:
+- Replace `0xADDR` with real symbol addresses from STM32 map.
+- STM32 variable access currently uses a whitelist table in `Core/Src/usart.c`.
+
 ## Regression Checklist
 
 After any protocol or variable map change:
