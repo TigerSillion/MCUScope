@@ -1,6 +1,7 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Fixed Keil MAP variable discovery under merged sections by adding `Image Symbol Table` parsing, so symbols like `com_u1_system_mode` / `com_f4_ref_speed_rpm` are discovered instead of only top-level section symbols.
 - Added `docs/GUI_AUTO_DEBUG_PLAN.md` with executable auto-debug workflow and GUI functional validation matrix (watch/scope/drag-drop/log diagnostics) for STM32 + RX dual-MAP scenarios.
 - Added protocol-side diagnostics and compatibility fixes for STM32 live debug:
   - MCU now ACKs `Ping (0x01)` to stop health-monitor command errors.

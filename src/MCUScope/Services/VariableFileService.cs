@@ -106,6 +106,12 @@ namespace MCUScope.Services
             @"^\s*0x([0-9A-Fa-f]{8})\s+(?:0x[0-9A-Fa-f]{8}|-)\s+0x([0-9A-Fa-f]+)\s+\w+\s+\w+\s+\d+\s+(\S+)\s+\S+\s*$",
             RegexOptions.Compiled);
 
+        // Keil image symbol table row:
+        // com_u1_system_mode  0x20000070  Data  1  main.o(.bss..L_MergedGlobals)
+        private static readonly Regex KeilSymbolRowRx = new(
+            @"^\s*(\S+)\s+0x([0-9A-Fa-f]{8})\s+(\w+)\s+([0-9A-Fa-f]+)\s+(.+)$",
+            RegexOptions.Compiled);
+
         private static List<VariableInfo> LoadMapFormat(string filePath)
         {
             var variables = new List<VariableInfo>();
@@ -113,7 +119,7 @@ namespace MCUScope.Services
             var seen = new HashSet<(string, uint)>();
 
             int globalCount = 0, localCount = 0, structCount = 0;
-            int keilCount = 0;
+            int keilCount = 0, keilSymbolCount = 0;
 
             // 1) Renesas CCRX symbol-list style parser.
             for (int i = 0; i < lines.Length; i++)
@@ -234,8 +240,63 @@ namespace MCUScope.Services
                 keilCount++;
             }
 
+            // 3) Keil image symbol table parser.
+            foreach (var line in lines)
+            {
+                var row = KeilSymbolRowRx.Match(line);
+                if (!row.Success)
+                    continue;
+
+                string symbolName = row.Groups[1].Value;
+                if (symbolName.StartsWith("[", StringComparison.Ordinal)) // [Anonymous Symbol]
+                    continue;
+                if (symbolName.Contains("$$", StringComparison.Ordinal)) // linker/system symbols
+                    continue;
+                if (!uint.TryParse(row.Groups[2].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var address))
+                    continue;
+                if (address < 0x20000000U || address >= 0x60000000U) // RAM data only
+                    continue;
+
+                // Keep function-static/compiler-local symbols out of GUI lists.
+                // For Keil maps, names containing '.' are almost always internal locals.
+                if (symbolName.Contains('.', StringComparison.Ordinal))
+                    continue;
+                if (IsInternalSymbolName(symbolName))
+                    continue;
+
+                string ovType = row.Groups[3].Value;
+                if (!ovType.Equals("Data", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string sizeToken = row.Groups[4].Value;
+                int size = 0;
+                if (!int.TryParse(sizeToken, NumberStyles.Integer, CultureInfo.InvariantCulture, out size))
+                {
+                    if (!int.TryParse(sizeToken, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out size))
+                        continue;
+                }
+                if (size <= 0)
+                    continue;
+
+                if (!seen.Add((symbolName, address)))
+                    continue;
+
+                var type = InferTypeFromName(symbolName) ?? SizeToType(size);
+                variables.Add(new VariableInfo
+                {
+                    Name = symbolName,
+                    Address = address,
+                    OriginalType = type,
+                    ModifiedType = type,
+                    DeclaredSize = size,
+                    IsGlobal = true,
+                    Category = CategorizeVariable(symbolName)
+                });
+                keilSymbolCount++;
+            }
+
             LogService.Info($"MAP loaded: {globalCount} globals, {structCount} struct members, " +
-                $"{localCount} locals, {keilCount} keil = {variables.Count} total from {Path.GetFileName(filePath)}");
+                $"{localCount} locals, {keilCount} keil exec, {keilSymbolCount} keil symbol = {variables.Count} total from {Path.GetFileName(filePath)}");
 
             if (variables.Count > 0)
                 return variables;

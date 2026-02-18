@@ -1,6 +1,17 @@
 # DEV_LOG.md
 
 ## 2026-02-18
+Summary: Fixed STM32 Keil MAP variable undercount (only a few globals shown) by parsing image symbol table entries.
+Files: src/MCUScope/Services/VariableFileService.cs, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- Added Keil `Image Symbol Table` parser in `VariableFileService` and merged results with existing execution-region parser using `(name,address)` dedup.
+- Included only RAM `Data` symbols and filtered linker/internal/local-static style symbols (`[Anonymous Symbol]`, `$$`, dotted names, internal prefixes).
+- This restores discovery of merged-section symbols such as `com_u1_system_mode`, `com_f4_ref_speed_rpm`, `g_u1_system_mode`, etc., instead of only a few top-level section symbols.
+Tests:
+- `dotnet build MCUScope.sln` executed; passed (`0 warning`, `0 error`) after releasing `MCUScope.exe` file lock.
+- `python tools/auto_debug_stm32.py --port COM7 --baud 2000000 --skip-build` executed; passed (`GetInfo/read/write/scope/stop` all pass).
+
+## 2026-02-18
 Summary: Added a dedicated GUI auto-debug plan and executed full STM32 automated validation run.
 Files: docs/GUI_AUTO_DEBUG_PLAN.md, docs/DEV_LOG.md.
 Behavior:
