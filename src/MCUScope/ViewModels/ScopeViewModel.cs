@@ -908,11 +908,17 @@ namespace MCUScope.ViewModels
 
         private void OnThemeChanged(object? sender, EventArgs e)
         {
-            // Rebuild plot models with current theme colors
-            MainPlotModel = CreateScopePlotModel("Scope Chart");
-            ZoomPlotModel = CreateScopePlotModel("Zoom");
-            FftPlotModel = CreateFftPlotModel();
-            UpdateMainChart();
+            // Avoid heavy synchronous plot-model rebuild during theme switching.
+            // Scope plot palette is currently fixed oscilloscope style, so only
+            // request lightweight redraw to keep UI responsive.
+            Application.Current?.Dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                new Action(() =>
+                {
+                    MainPlotModel.InvalidatePlot(false);
+                    ZoomPlotModel.InvalidatePlot(false);
+                    FftPlotModel.InvalidatePlot(false);
+                }));
         }
     }
 }

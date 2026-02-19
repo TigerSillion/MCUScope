@@ -1,6 +1,17 @@
 # DEV_LOG.md
 
 ## 2026-02-19
+Summary: Added additional anti-freeze guards for direct Light theme switching.
+Files: src/MCUScope/Views/MainWindow.xaml.cs, src/MCUScope/ViewModels/ScopeViewModel.cs, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- `MainWindow.OnThemeChanged` now uses async background-dispatch apply with a re-entry guard (`_isThemeSwitching`) to avoid nested theme-switch event stalls.
+- `ScopeViewModel.OnThemeChanged` removed synchronous plot model rebuild and now performs lightweight async invalidation only.
+- This further reduces UI blocking risk when switching to `Light`, including direct switch scenarios.
+Tests:
+- `dotnet build MCUScope.sln` executed; passed (`0 warning`, `0 error`).
+- `python tools/auto_debug_stm32.py --port COM7 --baud 2000000 --skip-build` executed; passed.
+
+## 2026-02-19
 Summary: Fixed possible GUI stall when switching theme during active serial/scope streaming.
 Files: src/MCUScope/ViewModels/ScopeViewModel.cs, docs/CHANGELOG.md, docs/DEV_LOG.md.
 Behavior:

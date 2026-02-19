@@ -16,6 +16,8 @@ namespace MCUScope.Views
 {
     public partial class MainWindow : Window
     {
+        private bool _isThemeSwitching;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -37,9 +39,13 @@ namespace MCUScope.Views
             {
                 if (e.PropertyName == nameof(SessionState.ConnectionStatus))
                 {
-                    ConnDot.Fill = SessionState.Instance.ConnectionStatus == ConnectionStatus.Connected
-                        ? new SolidColorBrush(Color.FromRgb(0x2E, 0xA0, 0x43))
-                        : new SolidColorBrush(Color.FromRgb(0xF8, 0x51, 0x49));
+                    string brushKey = SessionState.Instance.ConnectionStatus switch
+                    {
+                        ConnectionStatus.Connected    => "SuccessBrush",
+                        ConnectionStatus.IcsUnitOnly  => "WarningBrush",
+                        _                             => "TextMutedBrush",   // Disconnected
+                    };
+                    ConnDot.Fill = (Brush)FindResource(brushKey);
                 }
             };
 
@@ -52,12 +58,23 @@ namespace MCUScope.Views
 
         private void OnThemeChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (ThemeCombo.SelectedItem is string themeName)
+            if (_isThemeSwitching) return;
+            if (ThemeCombo.SelectedItem is not string themeName) return;
+
+            _isThemeSwitching = true;
+            Dispatcher.BeginInvoke(new Action(() =>
             {
-                ThemeService.Instance.ApplyTheme(themeName);
-                if (DataContext is MainViewModel vm)
-                    SessionState.Instance.Settings.ThemeName = themeName;
-            }
+                try
+                {
+                    ThemeService.Instance.ApplyTheme(themeName);
+                    if (DataContext is MainViewModel vm)
+                        SessionState.Instance.Settings.ThemeName = themeName;
+                }
+                finally
+                {
+                    _isThemeSwitching = false;
+                }
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
         private void OnPortComboDropDownOpened(object sender, EventArgs e)
@@ -196,6 +213,55 @@ namespace MCUScope.Views
             LogService.ClearLogEntries();
         }
 
+        // --- Drag-and-Drop: Watch DataGrid (drop target) ---
+
+        private void OnWatchGridDragOver(object sender, DragEventArgs e)
+        {
+            e.Effects = e.Data.GetDataPresent("MCUScope.VariableName")
+                ? DragDropEffects.Copy
+                : DragDropEffects.None;
+            e.Handled = true;
+        }
+
+        private void OnWatchGridDrop(object sender, DragEventArgs e)
+        {
+            if (DataContext is not MainViewModel vm) return;
+            if (!e.Data.GetDataPresent("MCUScope.VariableName")) return;
+            string varName = (string)e.Data.GetData("MCUScope.VariableName");
+            if (string.IsNullOrEmpty(varName)) return;
+
+            // Find the row under the cursor
+            if (sender is DataGrid dg)
+            {
+                var hit = dg.InputHitTest(e.GetPosition(dg)) as DependencyObject;
+                WatchItem? target = null;
+                while (hit != null)
+                {
+                    if (hit is DataGridRow row && row.Item is WatchItem wi)
+                    { target = wi; break; }
+                    hit = System.Windows.Media.VisualTreeHelper.GetParent(hit);
+                }
+                if (target != null)
+                {
+                    target.Name = varName;
+                    target.ReadEnabled = true;
+                    LogService.Info($"Dropped '{varName}' into watch slot");
+                    e.Handled = true;
+                    return;
+                }
+            }
+
+            // Fallback: first empty watch slot
+            var empty = vm.Watch.WatchItems.FirstOrDefault(w => string.IsNullOrEmpty(w.Name));
+            if (empty != null)
+            {
+                empty.Name = varName;
+                empty.ReadEnabled = true;
+                LogService.Info($"Dropped '{varName}' into watch");
+            }
+            e.Handled = true;
+        }
+
         // --- Watch context menu ---
         private void OnWatchRemove(object sender, RoutedEventArgs e)
         {
@@ -238,7 +304,8 @@ namespace MCUScope.Views
                 mi.Parent is ContextMenu ctx && ctx.PlacementTarget is DataGrid dg &&
                 dg.SelectedItem is WatchItem item && !string.IsNullOrEmpty(item.ReadValue))
             {
-                Clipboard.SetText(item.ReadValue);
+                try { Clipboard.SetText(item.ReadValue); }
+                catch { /* clipboard may be locked by another process */ }
             }
         }
 
@@ -270,6 +337,12 @@ namespace MCUScope.Views
             }
         }
 
+        private void OnScopeSaveScreenshot(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is MainViewModel vm)
+                vm.Scope.SaveScreenshotCommand.Execute(null);
+        }
+
         private void OnScopeChannelGridDragOver(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent("MCUScope.VariableName"))
@@ -289,9 +362,11 @@ namespace MCUScope.Views
             if (!e.Data.GetDataPresent("MCUScope.VariableName")) return;
 
             string variableName = (string)e.Data.GetData("MCUScope.VariableName");
-            if (!vm.Scope.VariableNames.Contains(variableName))
+            // Accept any variable that exists in the loaded variable list.
+            // Non-scalar variables will emit a warning when scope is started (RunScope).
+            if (!SessionState.Instance.IcsService.TryResolveVariable(variableName, out _))
             {
-                LogService.Warn($"Drop rejected: '{variableName}' is not a scope-bindable scalar variable.");
+                LogService.Warn($"Drop rejected: '{variableName}' not found in loaded variables.");
                 return;
             }
 

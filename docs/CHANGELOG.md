@@ -1,6 +1,9 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Further hardened theme-switch responsiveness:
+  - `MainWindow` theme switching now applies asynchronously with a re-entry guard,
+  - `ScopeViewModel` no longer rebuilds plot models on theme change (lightweight invalidate only).
 - Fixed potential UI freeze when switching theme while connected/scope streaming:
   - `ScopeViewModel` waveform callback no longer blocks with `Dispatcher.Invoke`,
   - switched to coalesced async UI updates (latest-frame-per-channel) to prevent UI message queue starvation.
