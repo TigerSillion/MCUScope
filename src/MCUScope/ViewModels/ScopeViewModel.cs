@@ -11,8 +11,11 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Windows;
+using System.Windows.Threading;
 using MathNet.Numerics.IntegralTransforms;
+using Microsoft.Win32;
 
 namespace MCUScope.ViewModels
 {
@@ -20,6 +23,9 @@ namespace MCUScope.ViewModels
     {
         private readonly SessionState _session;
         private readonly Dictionary<int, double[]> _channelData = new();
+        private readonly Dictionary<int, WaveformDataEventArgs> _pendingWaveforms = new();
+        private readonly object _pendingWaveformsLock = new();
+        private int _waveformUiUpdateScheduled = 0;
         private double _currentSamplePeriod = 0.0001;
 
         public ScopeViewModel()
@@ -49,6 +55,8 @@ namespace MCUScope.ViewModels
             }
 
             InitializePlotModels();
+
+            ThemeService.Instance.ThemeChanged += OnThemeChanged;
         }
 
         // Collections
@@ -459,19 +467,62 @@ namespace MCUScope.ViewModels
 
         private void OnWaveformDataReceived(object? sender, WaveformDataEventArgs e)
         {
-            Application.Current?.Dispatcher.Invoke(() =>
+            lock (_pendingWaveformsLock)
             {
-                _channelData[e.ChannelIndex] = e.Data;
-                _currentSamplePeriod = e.SamplePeriod;
+                // Keep only the latest frame per channel to avoid UI queue flood.
+                _pendingWaveforms[e.ChannelIndex] = e;
+            }
+
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher == null) return;
+
+            if (Interlocked.Exchange(ref _waveformUiUpdateScheduled, 1) == 0)
+            {
+                dispatcher.BeginInvoke(
+                    DispatcherPriority.Background,
+                    new Action(ProcessPendingWaveformsOnUi));
+            }
+        }
+
+        private void ProcessPendingWaveformsOnUi()
+        {
+            Dictionary<int, WaveformDataEventArgs> snapshot;
+            lock (_pendingWaveformsLock)
+            {
+                snapshot = new Dictionary<int, WaveformDataEventArgs>(_pendingWaveforms);
+                _pendingWaveforms.Clear();
+            }
+
+            foreach (var kv in snapshot)
+            {
+                var frame = kv.Value;
+                _channelData[frame.ChannelIndex] = frame.Data;
+                _currentSamplePeriod = frame.SamplePeriod;
+                UpdateScopeValues(frame.ChannelIndex, frame.Data);
+            }
+
+            if (snapshot.Count > 0)
+            {
                 UpdateMainChart();
                 if (FftEnabled)
                     UpdateFftChart();
                 UpdateZoomChart();
-                UpdateScopeValues(e.ChannelIndex, e.Data);
 
                 if (AutoSaveEnabled)
                     AutoSaveChartData();
-            });
+            }
+
+            Interlocked.Exchange(ref _waveformUiUpdateScheduled, 0);
+            lock (_pendingWaveformsLock)
+            {
+                if (_pendingWaveforms.Count > 0 &&
+                    Interlocked.Exchange(ref _waveformUiUpdateScheduled, 1) == 0)
+                {
+                    Application.Current?.Dispatcher.BeginInvoke(
+                        DispatcherPriority.Background,
+                        new Action(ProcessPendingWaveformsOnUi));
+                }
+            }
         }
 
         // ---- Chart Update Methods ----
@@ -493,7 +544,9 @@ namespace MCUScope.ViewModels
                 var series = new LineSeries
                 {
                     Color = OxyColor.FromArgb(channel.Color.A, channel.Color.R, channel.Color.G, channel.Color.B),
-                    StrokeThickness = 1.5
+                    StrokeThickness = 1.5,
+                    TrackerFormatString = $"{channel.ChannelId} {{4:G6}}  @{{2:G6}}s",
+                    Title = channel.ChannelId
                 };
 
                 for (int i = 0; i < kvp.Value.Length; i++)
@@ -538,7 +591,9 @@ namespace MCUScope.ViewModels
                 var series = new LineSeries
                 {
                     Color = OxyColor.FromArgb(channel.Color.A, channel.Color.R, channel.Color.G, channel.Color.B),
-                    StrokeThickness = 1.5
+                    StrokeThickness = 1.5,
+                    TrackerFormatString = $"{channel.ChannelId} {{4:G6}}  @{{2:G6}}s",
+                    Title = channel.ChannelId
                 };
 
                 for (int i = 0; i < kvp.Value.Length; i++)
@@ -568,6 +623,8 @@ namespace MCUScope.ViewModels
                 if (FftSource != "All" && channel.ChannelId != FftSource) continue;
 
                 var data = kvp.Value;
+                if (data.Length < 4) continue;  // not enough data for meaningful FFT
+
                 int n = 1;
                 while (n < data.Length) n <<= 1;
 
@@ -578,7 +635,8 @@ namespace MCUScope.ViewModels
                     complexData[i] = new System.Numerics.Complex(data[i] * windowVal, 0);
                 }
 
-                Fourier.Forward(complexData, FourierOptions.NoScaling);
+                try { Fourier.Forward(complexData, FourierOptions.NoScaling); }
+                catch (Exception ex) { LogService.Warn($"FFT failed: {ex.Message}"); continue; }
 
                 double freqRes = 1.0 / (_currentSamplePeriod * n);
                 int halfN = n / 2;
@@ -644,7 +702,17 @@ namespace MCUScope.ViewModels
 
         partial void OnSamplePeriodChanged(double value)
         {
+            if (value <= 0) { SamplePeriod = 0.000001; return; }
+            if (value > 10.0) { SamplePeriod = 10.0; return; }
             RecordLength = (int)(SecPerDiv * 10 / SamplePeriod) + 1;
+        }
+
+        partial void OnRecordLengthChanged(int value)
+        {
+            if (value < 1) RecordLength = 1;
+            else if (value > 4096) RecordLength = 4096;
+            // Update auto-computed SecPerDiv display
+            OnPropertyChanged(nameof(SecPerDiv));
         }
 
         // ---- Cursor change handlers ----
@@ -803,6 +871,48 @@ namespace MCUScope.ViewModels
                     FftSourceOptions.Add(sv.ChannelId);
             }
             FftSource = FftSourceOptions.Contains(current) ? current : "All";
+        }
+
+        // ---- Screenshot ----
+
+        [RelayCommand]
+        private void SaveScreenshot()
+        {
+            var dlg = new SaveFileDialog
+            {
+                Filter = "PNG Image (*.png)|*.png|SVG Vector (*.svg)|*.svg",
+                Title = "Save Scope Screenshot",
+                FileName = $"MCUScope_{DateTime.Now:yyyyMMdd_HHmmss}"
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            try
+            {
+                OxyPlot.IExporter exporter;
+                if (dlg.FileName.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                    exporter = new OxyPlot.SvgExporter { Width = 1280, Height = 720 };
+                else
+                    exporter = new OxyPlot.Wpf.PngExporter { Width = 1280, Height = 720 };
+
+                using var stream = File.Create(dlg.FileName);
+                exporter.Export(MainPlotModel, stream);
+                LogService.Info($"Screenshot saved: {Path.GetFileName(dlg.FileName)}");
+            }
+            catch (Exception ex)
+            {
+                LogService.Error($"Screenshot failed: {ex.Message}");
+            }
+        }
+
+        // ---- Theme Change Handler ----
+
+        private void OnThemeChanged(object? sender, EventArgs e)
+        {
+            // Rebuild plot models with current theme colors
+            MainPlotModel = CreateScopePlotModel("Scope Chart");
+            ZoomPlotModel = CreateScopePlotModel("Zoom");
+            FftPlotModel = CreateFftPlotModel();
+            UpdateMainChart();
         }
     }
 }

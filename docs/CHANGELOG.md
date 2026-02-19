@@ -1,6 +1,9 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Fixed potential UI freeze when switching theme while connected/scope streaming:
+  - `ScopeViewModel` waveform callback no longer blocks with `Dispatcher.Invoke`,
+  - switched to coalesced async UI updates (latest-frame-per-channel) to prevent UI message queue starvation.
 - Improved MAP usability for STM32 simulation debug by auto-generating known `g_st_sensorless_vector.*` synthetic members when Keil MAP exposes only the base struct symbol.
 - Improved `Light` theme readability and consistency:
   - switched key ComboBox popup/item brushes to dynamic themed resources,

@@ -1,6 +1,17 @@
 # DEV_LOG.md
 
 ## 2026-02-19
+Summary: Fixed possible GUI stall when switching theme during active serial/scope streaming.
+Files: src/MCUScope/ViewModels/ScopeViewModel.cs, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- Replaced synchronous `Dispatcher.Invoke` in scope waveform callback with async coalesced UI scheduling.
+- Added pending-frame merge (latest frame per channel) so high-frequency waveform callbacks cannot flood and block the UI thread.
+- Theme switch path now has significantly lower risk of UI starvation while connected and receiving data.
+Tests:
+- `dotnet build MCUScope.sln` executed; passed (`0 warning`, `0 error`).
+- `python tools/auto_debug_stm32.py --port COM7 --baud 2000000 --skip-build` executed; passed (`GetInfo/read/write/scope/stop` all pass).
+
+## 2026-02-19
 Summary: Improved STM32 MAP load usability, Light theme readability, and serial defaults (2M + local port auto-select).
 Files: src/MCUScope/Services/VariableFileService.cs, src/MCUScope/Services/ThemeService.cs, src/MCUScope/Resources/Styles.xaml, src/MCUScope/Models/ProjectSettings.cs, src/MCUScope/Services/SessionState.cs, src/MCUScope/ViewModels/CommunicationViewModel.cs, docs/CHANGELOG.md, docs/DEV_LOG.md.
 Behavior:
