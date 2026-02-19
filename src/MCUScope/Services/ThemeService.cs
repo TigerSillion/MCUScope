@@ -86,19 +86,20 @@ namespace MCUScope.Services
             },
             ["Light"] = new()
             {
-                ["PrimaryBg"] = Color(0xFF, 0xFF, 0xFF),
-                ["PanelBg"] = Color(0xF3, 0xF3, 0xF3),
-                ["ElevatedBg"] = Color(0xE8, 0xE8, 0xE8),
-                ["SurfaceBg"] = Color(0xDD, 0xDD, 0xDD),
-                ["BorderColor"] = Color(0xBB, 0xBB, 0xBB),
-                ["AccentColor"] = Color(0x00, 0x78, 0xD4),
-                ["AccentHover"] = Color(0x10, 0x6E, 0xBE),
-                ["TextPrimary"] = Color(0x1E, 0x1E, 0x1E),
-                ["TextSecondary"] = Color(0x44, 0x44, 0x44),
-                ["TextMuted"] = Color(0x88, 0x88, 0x88),
-                ["SuccessColor"] = Color(0x10, 0x7C, 0x10),
-                ["WarningColor"] = Color(0xCA, 0x83, 0x00),
-                ["ErrorColor"] = Color(0xE8, 0x1A, 0x1A),
+                // High-contrast neutral-blue light palette for oscilloscope UI readability.
+                ["PrimaryBg"] = Color(0xF3, 0xF6, 0xFA),
+                ["PanelBg"] = Color(0xE9, 0xEE, 0xF4),
+                ["ElevatedBg"] = Color(0xDD, 0xE6, 0xEF),
+                ["SurfaceBg"] = Color(0xF8, 0xFB, 0xFF),
+                ["BorderColor"] = Color(0x88, 0x9A, 0xB0),
+                ["AccentColor"] = Color(0x0B, 0x64, 0xB8),
+                ["AccentHover"] = Color(0x08, 0x56, 0x9E),
+                ["TextPrimary"] = Color(0x13, 0x1A, 0x22),
+                ["TextSecondary"] = Color(0x24, 0x31, 0x3F),
+                ["TextMuted"] = Color(0x4D, 0x5B, 0x6B),
+                ["SuccessColor"] = Color(0x16, 0x78, 0x2B),
+                ["WarningColor"] = Color(0xA8, 0x66, 0x00),
+                ["ErrorColor"] = Color(0xC2, 0x2D, 0x2D),
             },
         };
 
@@ -113,9 +114,11 @@ namespace MCUScope.Services
                 resources[kvp.Key] = kvp.Value;
                 // Also update the SolidColorBrush resources
                 string brushKey = kvp.Key + "Brush";
-                if (resources.Contains(brushKey) && resources[brushKey] is SolidColorBrush)
+                if (resources.Contains(brushKey) && resources[brushKey] is SolidColorBrush brush)
                 {
-                    resources[brushKey] = new SolidColorBrush(kvp.Value);
+                    // Update existing brush instance so controls bound with StaticResource
+                    // still repaint correctly after theme switch.
+                    brush.Color = kvp.Value;
                 }
             }
 

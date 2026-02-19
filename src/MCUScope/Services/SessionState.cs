@@ -33,7 +33,10 @@ namespace MCUScope.Services
             var unique = new HashSet<string>(StringComparer.Ordinal);
             foreach (var variable in IcsService.Variables)
             {
-                if (variable.IsLikelyInternal || !variable.IsProtocolScalar)
+                // Include all non-internal variables so Watch ComboBox and scope channel
+                // combo show the same set as the Variable Browser.
+                // Non-scalar variables assigned to scope channels will emit a warning at RunScope().
+                if (variable.IsLikelyInternal)
                     continue;
                 if (unique.Add(variable.DisplayName))
                 {
@@ -49,7 +52,7 @@ namespace MCUScope.Services
                 : (int)Math.Round(Settings.Communication.BaseClockMHz * 1_000_000 / 8.0);
 
             if (baudRate <= 0)
-                baudRate = 1_000_000;
+                baudRate = 2_000_000;
 
             return baudRate;
         }

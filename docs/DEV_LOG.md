@@ -1,6 +1,24 @@
 # DEV_LOG.md
 
 ## 2026-02-19
+Summary: Improved STM32 MAP load usability, Light theme readability, and serial defaults (2M + local port auto-select).
+Files: src/MCUScope/Services/VariableFileService.cs, src/MCUScope/Services/ThemeService.cs, src/MCUScope/Resources/Styles.xaml, src/MCUScope/Models/ProjectSettings.cs, src/MCUScope/Services/SessionState.cs, src/MCUScope/ViewModels/CommunicationViewModel.cs, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- MAP parsing:
+  - Added synthetic-member expansion for `g_st_sensorless_vector` when Keil map only provides base struct symbol.
+  - GUI can now directly load key member names (e.g. `g_st_sensorless_vector.f4_iu_ad`, `...f4_iv_ad`, `...f4_iw_ad`, speed/current sub-fields) for simulation watch/scope.
+- Light theme:
+  - Reworked light palette to higher-contrast neutral-blue scheme for clearer text/border differentiation.
+  - Updated ComboBox popup/item template brushes to dynamic resources for consistent light-theme rendering.
+  - Theme switch now updates existing brush instances in-place, so controls using static resource references repaint correctly.
+- Serial defaults:
+  - Changed communication default baud to `2000000`.
+  - Startup/refresh now auto-selects saved COM port if present, otherwise first local available port.
+Tests:
+- `dotnet build MCUScope.sln` executed; passed (`0 warning`, `0 error`).
+- `python tools/auto_debug_stm32.py --port COM7 --baud 2000000 --skip-build` executed; passed (`GetInfo/read/write/scope/stop` all pass).
+
+## 2026-02-19
 Summary: Expanded STM32-side motor simulation to a more complete dynamic model for GUI watch/scope evaluation.
 Files: Reference/G431_KEIL_Sample/Core/Inc/motor_sim_vars.h, Reference/G431_KEIL_Sample/Core/Src/main.c, docs/CHANGELOG.md, docs/DEV_LOG.md.
 Behavior:

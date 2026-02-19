@@ -80,7 +80,31 @@ namespace MCUScope.Services
             return variables;
         }
 
-        // Cached compiled regex for Renesas MAP format
+        // ── GCC/arm-none-eabi-gcc MAP patterns ─────────────────────────────────────
+        // Section line: " .data.varName" or " .bss.varName" with no address yet
+        private static readonly Regex GccSectionOnlyRx = new(
+            @"^\s+\.(data|bss|noinit|ccmram|dtcmram|sram2)\.([\w$]+)\s*$",
+            RegexOptions.Compiled);
+
+        // Section line WITH address+size inline (single-line variant):
+        // " .bss.varName    0x20000100    0x4    build/foo.o"
+        private static readonly Regex GccSectionInlineRx = new(
+            @"^\s+\.(data|bss|noinit|ccmram|dtcmram|sram2)\.([\w$]+)\s+(0x[0-9A-Fa-f]+)\s+(0x[0-9A-Fa-f]+)\s+\S",
+            RegexOptions.Compiled);
+
+        // Address+size continuation line (follows GccSectionOnlyRx or GccSectionInlineRx):
+        // "                0x0000000020000004        0x4 build/Core/Src/foo.o"
+        private static readonly Regex GccAddrSizeLine = new(
+            @"^\s+(0x[0-9A-Fa-f]+)\s+(0x[0-9A-Fa-f]+)\s+\S",
+            RegexOptions.Compiled);
+
+        // Optional symbol-name confirmation line:
+        // "                0x0000000020000004                varName"
+        private static readonly Regex GccSymbolLine = new(
+            @"^\s+(0x[0-9A-Fa-f]+)\s+([A-Za-z_][\w$]*)\s*$",
+            RegexOptions.Compiled);
+
+        // ── Renesas CCRX MAP patterns ───────────────────────────────────────────
         // Symbol name line: leading spaces + underscore + name (may contain dots for struct members)
         private static readonly Regex SymbolNameRx = new(
             @"^\s+_([A-Za-z][\w.]*)\s*$", RegexOptions.Compiled);
@@ -100,17 +124,150 @@ namespace MCUScope.Services
             @"^\s*([0-9a-fA-F]{4,8})\s+(_?\w+)\s+([0-9a-fA-F]+)",
             RegexOptions.Compiled | RegexOptions.Multiline);
 
-        // Keil/ARM map execution-region row:
-        // 0x2000000c   0x08005c64   0x00000004   Data   RW   25   .data.com_f4_speed_rate_limit_rpm  main.o
+        // Keil/ARM MDK execution-region row — supports BOTH 6-column and 7-column layouts:
+        //   6-col (standard MDK):   0x20000000  0x00000004  Data  RW  1  .data.varName  main.o
+        //   7-col (load+exec addr): 0x20000000  0x08005c64  0x00000004  Data  RW  25  .data.varName  main.o
+        // The optional second address column is the flash load address and is consumed non-greedily;
+        // regex backtracks correctly so size is always captured in group 2.
         private static readonly Regex KeilExecRowRx = new(
-            @"^\s*0x([0-9A-Fa-f]{8})\s+(?:0x[0-9A-Fa-f]{8}|-)\s+0x([0-9A-Fa-f]+)\s+\w+\s+\w+\s+\d+\s+(\S+)\s+\S+\s*$",
-            RegexOptions.Compiled);
+            @"^\s*0x([0-9A-Fa-f]{8})\s+(?:0x[0-9A-Fa-f]{8}\s+)?0x([0-9A-Fa-f]+)\s+Data\s+\w+\s+\d+\s+(\S+)\s+\S+\s*$",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         // Keil image symbol table row:
         // com_u1_system_mode  0x20000070  Data  1  main.o(.bss..L_MergedGlobals)
         private static readonly Regex KeilSymbolRowRx = new(
             @"^\s*(\S+)\s+0x([0-9A-Fa-f]{8})\s+(\w+)\s+([0-9A-Fa-f]+)\s+(.+)$",
             RegexOptions.Compiled);
+
+        /// <summary>
+        /// Parse GCC/arm-none-eabi-gcc linker MAP files (STM32, LPC, nRF, etc.).
+        /// Extracts RAM-resident variables from .data and .bss sections.
+        /// </summary>
+        private static List<VariableInfo> ParseGccMap(string[] lines, HashSet<(string, uint)> seen)
+        {
+            var result = new List<VariableInfo>();
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i];
+
+                // ── Try single-line format first ──────────────────────────────
+                // " .bss.varName    0x20000100    0x4    build/foo.o"
+                var inlineM = GccSectionInlineRx.Match(line);
+                if (inlineM.Success)
+                {
+                    string varName = inlineM.Groups[2].Value;
+                    uint address = GccParseHex(inlineM.Groups[3].Value);
+                    int size = (int)GccParseHex(inlineM.Groups[4].Value);
+
+                    if (IsValidGccRamVar(varName, address, size, seen))
+                        result.Add(MakeGccVar(varName, address, size));
+                    continue;
+                }
+
+                // ── Multi-line format ─────────────────────────────────────────
+                // Line 1: " .data.varName"
+                var sectionM = GccSectionOnlyRx.Match(line);
+                if (!sectionM.Success) continue;
+
+                string candidateName = sectionM.Groups[2].Value;
+                if (string.IsNullOrEmpty(candidateName)) continue;
+
+                // Line 2: "                0x20000100    0x4    build/foo.o"
+                if (i + 1 >= lines.Length) continue;
+                var addrM = GccAddrSizeLine.Match(lines[i + 1]);
+                if (!addrM.Success) continue;
+
+                uint addr2 = GccParseHex(addrM.Groups[1].Value);
+                int size2 = (int)GccParseHex(addrM.Groups[2].Value);
+
+                // Optional Line 3: "                0x20000100    varName"  (symbol confirmation)
+                // If present, prefer the confirmed name from that line.
+                string finalName = candidateName;
+                if (i + 2 < lines.Length)
+                {
+                    var symM = GccSymbolLine.Match(lines[i + 2]);
+                    if (symM.Success && symM.Groups[2].Value.Length > 0)
+                        finalName = symM.Groups[2].Value;
+                }
+
+                if (IsValidGccRamVar(finalName, addr2, size2, seen))
+                    result.Add(MakeGccVar(finalName, addr2, size2));
+            }
+
+            return result;
+        }
+
+        private static bool IsValidGccRamVar(string name, uint address, int size,
+            HashSet<(string, uint)> seen)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            if (size <= 0 || size > 4096) return false;                         // skip arrays
+            if (address < 0x20000000U || address >= 0x60000000U) return false;  // RAM only
+            if (IsInternalSymbolName(name)) return false;
+            // Skip very short or purely numeric names
+            if (name.Length < 2) return false;
+            return seen.Add((name, address));
+        }
+
+        private static VariableInfo MakeGccVar(string name, uint address, int size)
+        {
+            var type = InferTypeFromName(name) ?? InferTypeFromSize(name, size);
+            return new VariableInfo
+            {
+                Name = name,
+                Address = address,
+                OriginalType = type,
+                ModifiedType = type,
+                DeclaredSize = size,
+                IsGlobal = true,
+                Category = CategorizeVariable(name)
+            };
+        }
+
+        // For GCC, when no naming convention hint exists, use size + heuristics
+        private static VariableType InferTypeFromSize(string name, int size)
+        {
+            string lower = name.ToLowerInvariant();
+            // Names ending in common float-related words → float
+            if (size == 4 && (lower.Contains("rpm") || lower.Contains("current") ||
+                lower.Contains("voltage") || lower.Contains("speed") || lower.Contains("torque") ||
+                lower.Contains("flux") || lower.Contains("angle") || lower.Contains("freq") ||
+                lower.Contains("gain") || lower.Contains("ref") || lower.Contains("err") ||
+                lower.Contains("ratio") || lower.Contains("duty") || lower.Contains("power") ||
+                lower.Contains("temp") || lower.Contains("coeff") || lower.Contains("scale") ||
+                lower.Contains("limit") || lower.Contains("omega") || lower.Contains("zeta") ||
+                lower.Contains("vbus") || lower.Contains("vdc") || lower.Contains("param")))
+                return VariableType.Float32;
+            return size switch
+            {
+                1 => VariableType.UInt8,
+                2 => VariableType.Int16,
+                4 => VariableType.Float32,  // Most 4-byte MCU vars are float in motor control
+                _ => VariableType.UInt32
+            };
+        }
+
+        private static uint GccParseHex(string s)
+        {
+            s = s.Trim();
+            if (s.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) s = s[2..];
+            return uint.TryParse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var v) ? v : 0;
+        }
+
+        private static bool IsGccMapFile(string[] lines)
+        {
+            // GCC MAP files contain "Linker script and memory map" and GNU LD signature lines
+            int checked_ = 0;
+            foreach (var line in lines)
+            {
+                if (line.Contains("Linker script and memory map")) return true;
+                if (line.Contains("arm-none-eabi")) return true;
+                if (line.Contains("GNU ld") || line.Contains("GNU Binutils")) return true;
+                if (++checked_ > 30) break;
+            }
+            return false;
+        }
 
         private static List<VariableInfo> LoadMapFormat(string filePath)
         {
@@ -120,6 +277,17 @@ namespace MCUScope.Services
 
             int globalCount = 0, localCount = 0, structCount = 0;
             int keilCount = 0, keilSymbolCount = 0;
+
+            // 0) Try GCC/arm-none-eabi format FIRST if the file looks like a GNU LD map.
+            if (IsGccMapFile(lines))
+            {
+                var gccVars = ParseGccMap(lines, seen);
+                if (gccVars.Count > 0)
+                {
+                    LogService.Info($"GCC MAP: {gccVars.Count} RAM variables from {Path.GetFileName(filePath)}");
+                    return gccVars;
+                }
+            }
 
             // 1) Renesas CCRX symbol-list style parser.
             for (int i = 0; i < lines.Length; i++)
@@ -295,8 +463,11 @@ namespace MCUScope.Services
                 keilSymbolCount++;
             }
 
+            // 4) Add known synthetic struct members when Keil map only exposes base struct symbols.
+            int syntheticCount = AddKnownSyntheticMembers(variables, seen);
+
             LogService.Info($"MAP loaded: {globalCount} globals, {structCount} struct members, " +
-                $"{localCount} locals, {keilCount} keil exec, {keilSymbolCount} keil symbol = {variables.Count} total from {Path.GetFileName(filePath)}");
+                $"{localCount} locals, {keilCount} keil exec, {keilSymbolCount} keil symbol, {syntheticCount} synthetic = {variables.Count} total from {Path.GetFileName(filePath)}");
 
             if (variables.Count > 0)
                 return variables;
@@ -334,26 +505,88 @@ namespace MCUScope.Services
             return variables;
         }
 
+        private static int AddKnownSyntheticMembers(List<VariableInfo> variables, HashSet<(string, uint)> seen)
+        {
+            int added = 0;
+
+            VariableInfo? sensorlessBase = variables.FirstOrDefault(v =>
+                v.Name.Equals("g_st_sensorless_vector", StringComparison.Ordinal));
+            if (sensorlessBase != null)
+            {
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.f4_vdc_ad", sensorlessBase.Address + 0x00U, VariableType.Float32, 4);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.f4_iu_ad", sensorlessBase.Address + 0x04U, VariableType.Float32, 4);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.f4_iv_ad", sensorlessBase.Address + 0x08U, VariableType.Float32, 4);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.f4_iw_ad", sensorlessBase.Address + 0x0CU, VariableType.Float32, 4);
+
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_speed_output.f4_speed_rad_lpf", sensorlessBase.Address + 0x10U, VariableType.Float32, 4);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_speed_output.f4_ref_speed_rad_ctrl", sensorlessBase.Address + 0x14U, VariableType.Float32, 4);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_speed_output.f4_id_ref", sensorlessBase.Address + 0x18U, VariableType.Float32, 4);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_speed_output.f4_iq_ref", sensorlessBase.Address + 0x1CU, VariableType.Float32, 4);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_speed_output.f4_speed_err_rad", sensorlessBase.Address + 0x20U, VariableType.Float32, 4);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_speed_output.f4_torque_est_nm", sensorlessBase.Address + 0x24U, VariableType.Float32, 4);
+
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_current_output.u1_flag_offset_calc", sensorlessBase.Address + 0x28U, VariableType.UInt8, 1);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_current_output.u1_flag_charge_bootstrap", sensorlessBase.Address + 0x29U, VariableType.UInt8, 1);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_current_output.f4_ref_id_ctrl", sensorlessBase.Address + 0x2CU, VariableType.Float32, 4);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_current_output.f4_speed_rad", sensorlessBase.Address + 0x30U, VariableType.Float32, 4);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_current_output.f4_ed", sensorlessBase.Address + 0x34U, VariableType.Float32, 4);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_current_output.f4_eq", sensorlessBase.Address + 0x38U, VariableType.Float32, 4);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_current_output.f4_phase_err_rad", sensorlessBase.Address + 0x3CU, VariableType.Float32, 4);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_current_output.f4_bus_current_a", sensorlessBase.Address + 0x40U, VariableType.Float32, 4);
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_current_output.f4_bus_power_w", sensorlessBase.Address + 0x44U, VariableType.Float32, 4);
+
+                added += AddSyntheticMember(variables, seen, "g_st_sensorless_vector.st_stm.u1_status", sensorlessBase.Address + 0x48U, VariableType.UInt8, 1);
+            }
+
+            return added;
+        }
+
+        private static int AddSyntheticMember(
+            List<VariableInfo> variables,
+            HashSet<(string, uint)> seen,
+            string name,
+            uint address,
+            VariableType type,
+            int declaredSize)
+        {
+            if (!seen.Add((name, address)))
+                return 0;
+
+            variables.Add(new VariableInfo
+            {
+                Name = name,
+                Address = address,
+                OriginalType = type,
+                ModifiedType = type,
+                DeclaredSize = declaredSize,
+                IsGlobal = false,
+                Category = "Struct"
+            });
+            return 1;
+        }
+
+        // HAL/BSP/RTOS symbol prefixes to exclude from variable list
+        private static readonly string[] _internalPrefixes = {
+            ".L_", "Region$$", "HEAP", "STACK",
+            "__", "$",                               // compiler-generated
+            "g_ics2", "g_lpuart",                   // ICS/UART HAL internals
+            "hdma_", "hlpuart", "huart", "hspi", "hi2c", "htim", "hadc", "hcan",
+            "hiwdg", "hrng",                        // STM32 HAL handles
+            "LL_Init", "HAL_",                      // HAL function pointers sometimes appear
+        };
+
+        private static readonly string[] _internalExactNames = {
+            "uwTick", "SystemCoreClock", "uwTickPrio",
+            "uwTickFreq", "AHBPrescTable", "APBPrescTable",
+        };
+
         private static bool IsInternalSymbolName(string name)
         {
-            if (string.IsNullOrWhiteSpace(name))
-                return true;
-            if (name.StartsWith(".L_", StringComparison.Ordinal))
-                return true;
-            if (name.StartsWith("Region$$", StringComparison.Ordinal))
-                return true;
-            if (name.StartsWith("g_ics2", StringComparison.OrdinalIgnoreCase))
-                return true;
-            if (name.StartsWith("g_lpuart", StringComparison.OrdinalIgnoreCase))
-                return true;
-            if (name.StartsWith("hdma_", StringComparison.OrdinalIgnoreCase))
-                return true;
-            if (name.StartsWith("hlpuart", StringComparison.OrdinalIgnoreCase))
-                return true;
-            if (name.Equals("uwTick", StringComparison.OrdinalIgnoreCase))
-                return true;
-            if (name.Equals("SystemCoreClock", StringComparison.OrdinalIgnoreCase))
-                return true;
+            if (string.IsNullOrWhiteSpace(name)) return true;
+            foreach (var prefix in _internalPrefixes)
+                if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return true;
+            foreach (var exact in _internalExactNames)
+                if (name.Equals(exact, StringComparison.OrdinalIgnoreCase)) return true;
             return false;
         }
 
@@ -433,11 +666,20 @@ namespace MCUScope.Services
         {
             if (name.Contains('.')) return "Struct";
             string lower = name.ToLowerInvariant();
+            // Renesas conventions
             if (lower.StartsWith("com_")) return "COM";
             if (lower.StartsWith("g_st_")) return "Struct";
             if (lower.StartsWith("g_")) return "Global";
             if (lower.StartsWith("bsp_")) return "BSP";
             if (lower.StartsWith("r_")) return "Driver";
+            // STM32/GCC conventions
+            if (lower.StartsWith("foc_")) return "FOC";
+            if (lower.StartsWith("motor_")) return "Motor";
+            if (lower.StartsWith("pid_")) return "PID";
+            if (lower.StartsWith("hal_")) return "HAL";
+            if (lower.StartsWith("h") && (lower.StartsWith("huart") || lower.StartsWith("hspi") ||
+                lower.StartsWith("hi2c") || lower.StartsWith("htim") || lower.StartsWith("hadc")))
+                return "HAL";
             return "Other";
         }
 

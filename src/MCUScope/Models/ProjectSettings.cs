@@ -46,7 +46,7 @@ namespace MCUScope.Models
     public class CommunicationSettings
     {
         public string PortName { get; set; } = string.Empty;
-        public int BaudRate { get; set; } = 1000000; // 1Mbps default
+        public int BaudRate { get; set; } = 2000000; // 2Mbps default
         public double BaseClockMHz { get; set; } = 8.0;
     }
 

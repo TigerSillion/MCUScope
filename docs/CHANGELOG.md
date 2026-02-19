@@ -1,6 +1,14 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Improved MAP usability for STM32 simulation debug by auto-generating known `g_st_sensorless_vector.*` synthetic members when Keil MAP exposes only the base struct symbol.
+- Improved `Light` theme readability and consistency:
+  - switched key ComboBox popup/item brushes to dynamic themed resources,
+  - refined light palette for stronger text/background contrast,
+  - fixed theme switching by updating existing brush instances in-place.
+- Updated serial defaults for STM32 workflow:
+  - default baud rate is now `2000000`,
+  - port list auto-selects saved port or first available local COM port on startup/refresh.
 - Extended STM32 motor-state simulation in `Reference/G431_KEIL_Sample/Core/Src/main.c`:
   - added a richer speed-loop + torque/load + DC-bus dynamic model,
   - continuously updates three-phase currents, speed, bus voltage/current/power and phase error related globals,

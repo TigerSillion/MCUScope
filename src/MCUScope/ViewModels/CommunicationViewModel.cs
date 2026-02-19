@@ -20,7 +20,7 @@ namespace MCUScope.ViewModels
             _session.IcsService.ProtocolError += OnProtocolError;
 
             int saved = _session.ResolveBaudRate();
-            _baudRate = saved > 0 ? saved : 115200;
+            _baudRate = saved > 0 ? saved : 2_000_000;
             RefreshPorts();
             UpdateSerialLocalStatus();
         }
@@ -30,7 +30,7 @@ namespace MCUScope.ViewModels
         [ObservableProperty] private string _serialLocalStatusText = "Port: -, Baud: -, Local: Disconnected";
         [ObservableProperty] private ConnectionStatus _connectionStatus = ConnectionStatus.Disconnected;
         [ObservableProperty] private string _statusText = "Disconnected";
-        [ObservableProperty] private int _baudRate = 115200;
+        [ObservableProperty] private int _baudRate = 2000000;
 
         public ObservableCollection<int> BaudRateOptions { get; } = new()
         {
@@ -53,6 +53,19 @@ namespace MCUScope.ViewModels
 
             if (!string.IsNullOrEmpty(SelectedPort) && !AvailablePorts.Contains(SelectedPort))
                 SelectedPort = string.Empty;
+
+            if (string.IsNullOrEmpty(SelectedPort))
+            {
+                string savedPort = _session.Settings.Communication.PortName;
+                if (!string.IsNullOrWhiteSpace(savedPort) && AvailablePorts.Contains(savedPort))
+                {
+                    SelectedPort = savedPort;
+                }
+                else if (AvailablePorts.Count > 0)
+                {
+                    SelectedPort = AvailablePorts[0];
+                }
+            }
 
             UpdateSerialLocalStatus();
         }
