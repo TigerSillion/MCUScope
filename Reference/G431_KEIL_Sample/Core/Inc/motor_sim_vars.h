@@ -9,6 +9,8 @@ typedef struct
   float f4_ref_speed_rad_ctrl;
   float f4_id_ref;
   float f4_iq_ref;
+  float f4_speed_err_rad;
+  float f4_torque_est_nm;
 } sim_speed_output_t;
 
 typedef struct
@@ -20,6 +22,8 @@ typedef struct
   float f4_ed;
   float f4_eq;
   float f4_phase_err_rad;
+  float f4_bus_current_a;
+  float f4_bus_power_w;
 } sim_current_output_t;
 
 typedef struct
@@ -42,6 +46,10 @@ extern volatile uint8_t com_u1_system_mode;
 extern volatile uint8_t g_u1_system_mode;
 extern volatile float com_f4_ref_speed_rpm;
 extern volatile float com_f4_speed_rate_limit_rpm;
+extern volatile float com_f4_load_torque_nm;
+extern volatile float com_f4_dc_bus_nominal_v;
+extern volatile float com_f4_motor_inertia;
+extern volatile float com_f4_motor_friction;
 extern volatile sim_sensorless_vector_t g_st_sensorless_vector;
 
 #endif

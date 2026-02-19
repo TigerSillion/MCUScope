@@ -1,5 +1,28 @@
 # DEV_LOG.md
 
+## 2026-02-19
+Summary: Expanded STM32-side motor simulation to a more complete dynamic model for GUI watch/scope evaluation.
+Files: Reference/G431_KEIL_Sample/Core/Inc/motor_sim_vars.h, Reference/G431_KEIL_Sample/Core/Src/main.c, docs/CHANGELOG.md, docs/DEV_LOG.md.
+Behavior:
+- Enhanced `MotorSim_UpdateState()` from a simple slew + sine source into a richer model including:
+  - speed PI loop (`speed_err -> iq_ref`) with integrator clamping,
+  - torque balance (`electromagnetic torque - load torque - friction`) and inertia dynamics,
+  - electrical angle evolution from mechanical speed (pole-pair mapping),
+  - DC-bus dynamic behavior with nominal-bus target, load-dependent sag, and ripple.
+- Continued and improved real-time updates of GUI-critical variables:
+  - three-phase currents: `g_st_sensorless_vector.f4_iu_ad/f4_iv_ad/f4_iw_ad`,
+  - speed: `st_speed_output.f4_speed_rad_lpf`, `st_speed_output.f4_ref_speed_rad_ctrl`,
+  - bus voltage: `f4_vdc_ad`,
+  - added bus current/power and speed-loop/torque observables.
+- Added new writable simulation control globals:
+  - `com_f4_load_torque_nm`,
+  - `com_f4_dc_bus_nominal_v`,
+  - `com_f4_motor_inertia`,
+  - `com_f4_motor_friction`.
+Tests:
+- Host-side compatibility smoke executed: `python tools/auto_debug_stm32.py --port COM7 --baud 2000000 --skip-build` passed.
+- Note: STM32 firmware rebuild/flash was not executed in this workspace; new simulation behavior becomes visible on GUI after reflashing updated firmware to board.
+
 ## 2026-02-18
 Summary: Fixed STM32 Keil MAP variable undercount (only a few globals shown) by parsing image symbol table entries.
 Files: src/MCUScope/Services/VariableFileService.cs, docs/CHANGELOG.md, docs/DEV_LOG.md.

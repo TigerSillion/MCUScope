@@ -70,6 +70,10 @@ volatile uint8_t com_u1_system_mode = 0U;
 volatile uint8_t g_u1_system_mode = 0U;
 volatile float com_f4_ref_speed_rpm = 0.0f;
 volatile float com_f4_speed_rate_limit_rpm = 600.0f;
+volatile float com_f4_load_torque_nm = 0.12f;
+volatile float com_f4_dc_bus_nominal_v = 24.0f;
+volatile float com_f4_motor_inertia = 0.004f;
+volatile float com_f4_motor_friction = 0.0009f;
 volatile sim_sensorless_vector_t g_st_sensorless_vector = {0};
 
 /* USER CODE END PV */
@@ -225,15 +229,31 @@ static float ClampF32(float value, float min_value, float max_value)
 static void MotorSim_UpdateState(void)
 {
   static uint32_t last_tick = 0U;
+  static float mech_speed_rad = 0.0f;
   static float speed_rpm = 0.0f;
+  static float elec_phase_pu = 0.0f;
+  static float iq_int = 0.0f;
+  static float vdc_state = 24.0f;
   static float phase = 0.0f;
   uint32_t now_tick = HAL_GetTick();
   uint32_t dt_ms = 0U;
   float dt_s = 0.0f;
   float target_rpm = 0.0f;
+  float target_rad = 0.0f;
   float slew_limit = 0.0f;
   float delta = 0.0f;
   float amp = 0.0f;
+  float speed_err = 0.0f;
+  float iq_ref = 0.0f;
+  float id_ref = 0.0f;
+  float torque_em = 0.0f;
+  float torque_load = 0.0f;
+  float inertia = 0.0f;
+  float friction = 0.0f;
+  float bus_current = 0.0f;
+  float bus_power = 0.0f;
+  float bus_ref = 0.0f;
+  float phase_err = 0.0f;
 
   if (now_tick == last_tick)
   {
@@ -243,6 +263,10 @@ static void MotorSim_UpdateState(void)
   dt_ms = now_tick - last_tick;
   last_tick = now_tick;
   dt_s = 0.001f * (float)dt_ms;
+  if (dt_s > 0.02f)
+  {
+    dt_s = 0.02f;
+  }
 
   if (com_u1_system_mode == 1U)
   {
@@ -264,26 +288,72 @@ static void MotorSim_UpdateState(void)
     }
   }
 
-  phase = WrapPu(phase + ((speed_rpm / 60.0f) * dt_s));
-  amp = ClampF32((speed_rpm >= 0.0f ? speed_rpm : -speed_rpm) / 3000.0f, 0.0f, 1.0f);
+  target_rad = target_rpm * 0.10471976f;
+  speed_err = target_rad - mech_speed_rad;
 
-  g_st_sensorless_vector.f4_vdc_ad = 24.0f + (1.0f * FastSinPu(phase * 0.05f));
+  /* Speed PI -> q-axis current ref. */
+  iq_int += (speed_err * 0.6f) * dt_s;
+  iq_int = ClampF32(iq_int, -3.0f, 3.0f);
+  iq_ref = (0.04f * speed_err) + iq_int;
+  iq_ref = ClampF32(iq_ref, -4.0f, 4.0f);
+  id_ref = 0.0f;
+
+  torque_load = ClampF32(com_f4_load_torque_nm, 0.0f, 1.5f);
+  torque_em = 0.18f * iq_ref;
+  inertia = ClampF32(com_f4_motor_inertia, 0.001f, 0.02f);
+  friction = ClampF32(com_f4_motor_friction, 0.0001f, 0.01f);
+
+  if (g_u1_system_mode == 1U)
+  {
+    mech_speed_rad += ((torque_em - torque_load - (friction * mech_speed_rad)) / inertia) * dt_s;
+  }
+  else
+  {
+    iq_int *= 0.95f;
+    mech_speed_rad *= 0.985f;
+  }
+
+  mech_speed_rad = ClampF32(mech_speed_rad, -550.0f, 550.0f);
+  speed_rpm = mech_speed_rad * 9.54929659f;
+
+  /* 2-pole-pair electrical angle model. */
+  elec_phase_pu = WrapPu(elec_phase_pu + ((mech_speed_rad * 2.0f) * 0.15915494f * dt_s));
+  phase = elec_phase_pu;
+
+  amp = ClampF32((iq_ref >= 0.0f ? iq_ref : -iq_ref) / 4.0f, 0.02f, 1.0f);
+  phase_err = 0.03f * FastSinPu(phase * 0.27f);
+
+  bus_ref = ClampF32(com_f4_dc_bus_nominal_v, 12.0f, 60.0f);
+  bus_current = (0.35f + (0.75f * amp)) + (0.15f * FastSinPu(phase + 0.07f));
+  if (g_u1_system_mode == 0U)
+  {
+    bus_current *= 0.35f;
+  }
+  bus_power = bus_current * ClampF32(vdc_state, 5.0f, 80.0f);
+  vdc_state += ((bus_ref - vdc_state) * 0.9f + (0.45f * FastSinPu(phase * 0.08f)) - (0.22f * bus_current)) * dt_s;
+  vdc_state = ClampF32(vdc_state, 10.0f, 70.0f);
+
+  g_st_sensorless_vector.f4_vdc_ad = vdc_state;
   g_st_sensorless_vector.f4_iu_ad = amp * FastSinPu(phase);
   g_st_sensorless_vector.f4_iv_ad = amp * FastSinPu(phase + (1.0f / 3.0f));
   g_st_sensorless_vector.f4_iw_ad = amp * FastSinPu(phase + (2.0f / 3.0f));
 
-  g_st_sensorless_vector.st_speed_output.f4_speed_rad_lpf = speed_rpm * 0.10471976f;
-  g_st_sensorless_vector.st_speed_output.f4_ref_speed_rad_ctrl = target_rpm * 0.10471976f;
-  g_st_sensorless_vector.st_speed_output.f4_id_ref = 0.15f * amp;
-  g_st_sensorless_vector.st_speed_output.f4_iq_ref = 0.85f * amp;
+  g_st_sensorless_vector.st_speed_output.f4_speed_rad_lpf = mech_speed_rad;
+  g_st_sensorless_vector.st_speed_output.f4_ref_speed_rad_ctrl = target_rad;
+  g_st_sensorless_vector.st_speed_output.f4_id_ref = id_ref;
+  g_st_sensorless_vector.st_speed_output.f4_iq_ref = iq_ref;
+  g_st_sensorless_vector.st_speed_output.f4_speed_err_rad = speed_err;
+  g_st_sensorless_vector.st_speed_output.f4_torque_est_nm = torque_em;
 
   g_st_sensorless_vector.st_current_output.u1_flag_offset_calc = 1U;
   g_st_sensorless_vector.st_current_output.u1_flag_charge_bootstrap = 1U;
-  g_st_sensorless_vector.st_current_output.f4_ref_id_ctrl = g_st_sensorless_vector.st_speed_output.f4_id_ref;
-  g_st_sensorless_vector.st_current_output.f4_speed_rad = speed_rpm * 0.10471976f;
-  g_st_sensorless_vector.st_current_output.f4_ed = amp * FastSinPu(phase + 0.25f);
-  g_st_sensorless_vector.st_current_output.f4_eq = amp * FastSinPu(phase + 0.50f);
-  g_st_sensorless_vector.st_current_output.f4_phase_err_rad = 0.02f * FastSinPu(phase * 0.2f);
+  g_st_sensorless_vector.st_current_output.f4_ref_id_ctrl = id_ref;
+  g_st_sensorless_vector.st_current_output.f4_speed_rad = mech_speed_rad;
+  g_st_sensorless_vector.st_current_output.f4_ed = amp * FastSinPu(phase + 0.25f) * vdc_state * 0.08f;
+  g_st_sensorless_vector.st_current_output.f4_eq = amp * FastSinPu(phase + 0.50f) * vdc_state * 0.08f;
+  g_st_sensorless_vector.st_current_output.f4_phase_err_rad = phase_err;
+  g_st_sensorless_vector.st_current_output.f4_bus_current_a = bus_current;
+  g_st_sensorless_vector.st_current_output.f4_bus_power_w = bus_power;
 
   g_st_sensorless_vector.st_stm.u1_status = (g_u1_system_mode == 1U) ? 2U : 1U;
 }
@@ -329,6 +399,10 @@ int main(void)
   com_u1_system_mode = 0U;
   com_f4_ref_speed_rpm = 600.0f;
   com_f4_speed_rate_limit_rpm = 1200.0f;
+  com_f4_load_torque_nm = 0.12f;
+  com_f4_dc_bus_nominal_v = 24.0f;
+  com_f4_motor_inertia = 0.004f;
+  com_f4_motor_friction = 0.0009f;
 
   /* USER CODE END 2 */
 

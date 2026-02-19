@@ -1,6 +1,11 @@
 # CHANGELOG.md
 
 ## Unreleased
+- Extended STM32 motor-state simulation in `Reference/G431_KEIL_Sample/Core/Src/main.c`:
+  - added a richer speed-loop + torque/load + DC-bus dynamic model,
+  - continuously updates three-phase currents, speed, bus voltage/current/power and phase error related globals,
+  - added new commandable simulation knobs (`com_f4_load_torque_nm`, `com_f4_dc_bus_nominal_v`, `com_f4_motor_inertia`, `com_f4_motor_friction`).
+- Extended simulation variable structures in `Reference/G431_KEIL_Sample/Core/Inc/motor_sim_vars.h` for additional speed/current outputs.
 - Fixed Keil MAP variable discovery under merged sections by adding `Image Symbol Table` parsing, so symbols like `com_u1_system_mode` / `com_f4_ref_speed_rpm` are discovered instead of only top-level section symbols.
 - Added `docs/GUI_AUTO_DEBUG_PLAN.md` with executable auto-debug workflow and GUI functional validation matrix (watch/scope/drag-drop/log diagnostics) for STM32 + RX dual-MAP scenarios.
 - Added protocol-side diagnostics and compatibility fixes for STM32 live debug:
